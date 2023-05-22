@@ -57,6 +57,7 @@ The dataset used for the Kostyrko et al study can be accessed from the GEO Super
   12. `library(ggbio)`: Visualization tools for genomic data.
   13. `library(limma)`: Linear models for microarray data.
   14. `library(pathfindR)`: An R package for comprehensive identification of enriched pathways in omics data through active subnetworks
+  15. `library (DGCA)`: #Differential Gene Correlation Analysis
 
   
   ### Genomic Data Analysis (Epigenetics):
@@ -89,6 +90,10 @@ The dataset used for the Kostyrko et al study can be accessed from the GEO Super
   15. `library(Vennerable)`: Venn and Euler area-proportional diagrams.
   16. `library(wesanderson)`: Wes Anderson color palettes.
   17. `library(igraph)`: Network analysis and visualization.
+  18. `library (ggbeeswarm)` # Beeswarm plots helper
+  19. `library(forestplot)` # forest plot helper, mostly use in meta-analysis
+  20. `library (ggridges)` # Ridgeline plots 
+  21. `library(cowplot)` # functions to align plots and arrange them into complex compound figures
   
   ### Statistical Analysis:
   1. `library(FactoMineR)`: An R package for multivariate analysis.
@@ -117,6 +122,7 @@ The dataset used for the Kostyrko et al study can be accessed from the GEO Super
   ### Document Generation and Reporting:
   1. `library(knitr)`: A general-purpose tool for dynamic report generation in R.
   2. `library(pander)`: An R Pandoc writer.
+  3. `library(stargazer)` # LATEX, HTML and ASCII tables from R statistical output
   
   ### File I/O:
   1. `library(openxlsx)`: Read, write and edit XLSX files.
