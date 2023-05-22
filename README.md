@@ -1,7 +1,7 @@
 
 # Kostyrko Multiomics Analysis for Methylation EPIC and RNAseq
 # Description
-This repository contains a set of R scripts specifically designed for the data analysis performed in Kostyrko et al. The scripts provide a R scripts for analyzing Methylation EPIC and RNAseq (correlation and survival analysis) used in the original paper. This respository is a resource for researchers looking to replicate or build upon the findings of Kostyrko et al.
+This repository contains a set of R scripts specifically designed for the data analysis performed in Kostyrko et al. The repository provides a set of R scripts for analyzing Methylation EPIC and RNAseq (correlation and survival analysis) used in the original paper. This respository is a resource for researchers looking to replicate or build upon the findings of Kostyrko et al.
 # Features
 ## Methylation EPIC Analysis & RNAseq Correlation: 
   + This repo is tailored to handle Methylation EPIC data and RNAseq correlation analysis as performed in the Kostyrko et al study.
