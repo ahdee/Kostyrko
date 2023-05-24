@@ -17,7 +17,6 @@ The dataset used for the Kostyrko et al study can be accessed from the GEO Super
   * Download the dataset from GEO SuperSeries GSE198289.
   * R packages
  
-    + STAR (2.5.3a)
     + edgeR (3.28.1) 
     + Minfi (1.32)
     + EpiDISH (2.2.2)
@@ -26,7 +25,7 @@ The dataset used for the Kostyrko et al study can be accessed from the GEO Super
     + DMRcate (2.0.7)
     + survminer (0.4.6.999) and survival (3.1.11) 
     + DGCA (1.0.2 )
-    + methylGSA (1.4.9) , Cytoscape ( 3.8.2) clueGO (2.5.9)
+    + methylGSA (1.4.9) 
 ## additional packages 
   <details>
   <summary>Click to expand Bioinformatics and Genomics packages!</summary>
