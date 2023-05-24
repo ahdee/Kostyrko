@@ -1,0 +1,4949 @@
+---
+title: "Methylation/survival analysis for UHRF1 mediator of KRASin lung adenocarcinoma  "
+author: "Kostyrko et al"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+html_document:
+toc: TRUE
+toc_float: FALSE
+editor_options: 
+  chunk_output_type: console
+chunk_output_type: console
+---
+
+
+<style type="text/css">
+.main-container {
+max-width: 2500px;
+margin-left: 5px;
+margin-right: auto;
+}
+.toc-content {
+max-width: 2500px;
+margin-left: 50px;
+margin-right: auto;
+}
+
+div {
+
+margin-left: 5px;
+}
+
+
+hr.new1 {
+border-top: 1px solid #84a8e0;
+}
+
+
+</style>
+
+version: 1.0 <br />
+Run at "`r format(Sys.time())`"
+
+# Overview/Method:
+
+  * Data analysis performed in Kostyrko et al., 2023.
+  
+  * The dataset used for the Kostyrko et al study can be accessed from the GEO SuperSeries under the accession number GSE198289.
+    + This SuperSeries is composed of the following SubSeries:
+    + GSE198289	UHRF1 is a mediator of KRAS driven oncogenesis in lung adenocarcinoma [RNA-seq]
+    + GSE198446	UHRF1 is a mediator of KRAS driven oncogenesis in lung adenocarcinoma [epic_methyl]
+    + GSE209923	UHRF1 is a mediator of KRAS driven oncogenesis in lung adenocarcinoma [shRNA]
+  
+  * Additional detailed information and datasets can be downloaded from: https://github.com/ahdee/Kostyrko_2023.
+  
+  * Please keep in mind that it would take a minimum of > 60GB to successfully run this markdown.
+    
+```{r setup, include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+
+knitr::opts_chunk$set(include=F, echo=FALSE, message=FALSE, warning=FALSE, fig.show="asis", fig.keep="all",tidy.opts=list(width.cutoff=100),tidy=TRUE, cache=F)
+options(knitr.table.format = "latex")
+options(width = 1600)
+### global options 
+options(scipen=999)
+ 
+update = 0 
+savexls = 0 
+## load libraries 
+
+# Genomic Data Annotation #
+
+library(biomaRt) # Tools for BioMart databases (like Ensembl).
+library(BSgenome) # Infrastructure for Bioconductor packages using large-scale genomic or other data.
+library(org.Hs.eg.db) # Mapping information for human genes.
+library(GenomicFeatures) # Tools for making and manipulating transcript centric annotations.
+library(IlluminaHumanMethylation450kanno.ilmn12.hg19) # Annotation data for the Illumina Human Methylation 450k array.
+library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19) # Annotation data for the Illumina Human Methylation EPIC array.
+library(IlluminaHumanMethylationEPICmanifest) # Manifest file for Illumina's EPIC methylation arrays.
+library(Homo.sapiens) # Annotation data for the human genome.
+
+
+# Genomic Data Analysis (Omics) #
+
+library(limma) # Linear models for microarray data.
+library(DESeq2) # Differential gene expression analysis based on the negative binomial distribution.
+library(edgeR) # Empirical analysis of digital gene expression data in R.
+library(GenomicRanges) # Representations and manipulations of genomic intervals and variables defined along a genome.
+library(GSVA) # Gene set variation analysis for microarray and RNA-seq data.
+library(Gviz) # Plotting data and annotation information along genomic coordinates.
+library(minfi) # Tools to analyze Illumina's methylation arrays.
+library(missMethyl) # Analyzes differential methylation in the context of GC content.
+library(methylGSA) # Gene set testing for Illumina's methylation arrays.
+library(pathview) # Plots pathway maps and overlays experimental data.
+library(sva) # Surrogate Variable Analysis # identification and adjustment for hidden confounding factors.
+library(biovizBase) # Basic graphic utilities for visualization of genomic data.
+library(ggbio) # Visualization tools for genomic data.
+
+
+#Statistical Genomics #
+
+library(clusterProfiler) # Analysis and visualization of functional profiles for genes and gene clusters.
+library(DGCA) # Differential gene correlation analysis.
+library(DMRcate) # Detects differentially methylated regions in genomic data.
+library(EpiDISH) # Decomposes cell mixture distribution in DNA methylation data.
+library(rtracklayer) # Tools to interact with genome browsers, manipulate genomic tracks, and visualize genomic data.
+library(fgsea) # Fast implementation of preranked gene set enrichment analysis (GSEA).
+library(pathfindR) # Pathway enrichment analysis utilizing active subnetworks.
+library (DGCA) #Differential Gene Correlation Analysis
+
+# Data Manipulation #
+
+library(data.table) # Extension of R's data.frame.
+library(dplyr) # A grammar of data manipulation.
+library(forcats) # Tools for working with categorical variables (factors).
+library(tidyr) # Tools to tidy messy datasets.
+library(plyr) # Tools for splitting, applying and combining data.
+library(reshape) # Flexibly reshape data.
+library(stringr) # Simple, consistent wrappers for common string operations.
+
+# Data Transformation 
+
+library(scales) # Scale functions for visualization.
+
+
+#Heatmaps and Clustering #
+
+library(ComplexHeatmap) # Making complex heatmaps.
+library(d3heatmap) # Interactive heatmaps.
+library(dendextend) # Extending R's dendrogram functionality.
+library(dendroextras) # Extra functions to cut, label and colour dendrogram clusters
+library(heatmap3) # Enhanced heatmap representation.
+library(heatmaply) # Interactive heatmaps.
+library(pheatmap) # Pretty heatmaps.
+
+# Visualization #
+
+library(corrplot) # Visualization of a correlation matrix.
+library(cowplot) # functions to align plots and arrange them into complex compound figures
+library(factoextra) # Extract and visualize the results of multivariate data analyses.
+library ( ggbeeswarm ) # Beeswarm plots helper
+library(ggdendro) # Create dendrograms using ggplot.
+library(ggplot2) # An implementation of the Grammar of Graphics.
+library(ggplotify) # Convert plot function call to 'ggplot' objects.
+library(ggpubr) # 'ggplot2' based publication ready plots.
+library(ggpval) # Annotate statistical significance onto 'ggplot' objects.
+library(ggrepel) # Automatically position non-overlapping text labels with 'ggplot2'.
+library(gplots) # Various R programming tools for plotting data.
+library(gridExtra) # Miscellaneous functions for "grid" graphics.
+library(forestplot) # forest plot helper, mostly use in meta-analysis
+library(patchwork) # The composer of ggplots.
+library(RColorBrewer) # ColorBrewer palettes.
+library ( ggridges) # Ridgeline plots 
+library(VennDiagram) # Generate high-resolution Venn and Euler plots.
+library(Vennerable) # Venn and Euler area-proportional diagrams.
+library(wesanderson) # Wes Anderson color palettes.
+library(stargazer) # LATEX, HTML and ASCII tables from R statistical output
+
+
+#Statistical Analysis #
+
+library(FactoMineR) # An R package for multivariate analysis.
+library(fgsea) # Fast gene set enrichment analysis.
+library(MASS) # Functions and datasets to support Venables and Ripley's MASS.
+library(matrixStats) # Functions that apply to rows and columns of matrices (and to vectors).
+library(PerformanceAnalytics) # Econometric tools for performance and risk analysis.
+library(psych) # Procedures for psychological, psychometric, and personality research.
+library(survival) # Survival analysis.
+library(survminer) # Drawing survival curves using 'ggplot2'.
+library(vegan) # Community Ecology Package.
+
+#High-Dimensional Data Analysis #
+
+library(Rtsne) # T-Distributed Stochastic Neighbor Embedding using a Barnes-Hut implementation.
+library(umap) # Uniform Manifold Approximation and Projection.
+library(parallelDist) # Parallel distance matrix computation.
+
+#Table/Spreadsheet Handling #
+
+library(DT) # A wrapper of the JavaScript library 'DataTables'.
+library(openxlsx) # Read, write and edit XLSX files.
+
+# Report Generation #
+
+library(knitr) # A general-purpose literate programming engine.
+library(pander) # An R Pandoc writer.
+library(kableExtra) # Build complex HTML or 'LaTeX' tables using 'kable()' and pipe syntax.
+
+#Network Analysis #
+
+library(igraph) # Network analysis and visualization.
+
+
+
+data(centDHSbloodDMC.m)
+getPalette = colorRampPalette(brewer.pal(9, "Set1")) # expand color pallete
+
+```
+
+
+
+```{r}
+# original study 
+
+## read in resources 
+## 
+main.data = "/data/"
+resource = "/ehome/resource/"
+resource.ext = "/ehome/"
+input_dir = "./input/"
+dir.create(input_dir)
+epic = paste0(resource, "EPIC")
+final_fig = "./paper_fig/revision/"
+dir.create(final_fig)
+source ( "./aux1.1.R" )
+
+
+## pathways 
+
+pathways = readRDS( paste0( resource, "/gsea/limma/go_path.rds"))
+# change column to make it work with profiler 
+pathway.p = pathways
+colnames ( pathway.p)[1] = c("geneID")
+
+annt =  readRDS( paste0( resource, "/gsea/limma/go_path_withWeneName.rds"))
+annt$GeneID = NULL 
+
+colnames ( annt ) = c ( "gene"  , "term")
+annt = annt [ ,  c ( "term"  , "gene") ]
+pathgsea =  readRDS( paste0( resource, "/gsea/limma/go_path_fgsea_genename.rds"))
+
+
+wb <- createWorkbook()
+
+out.dir = "./out/"
+dir.create(out.dir)
+
+cosmic = read.csv("https://www.dropbox.com/s/ceo0ol2h9vt01c3/cosmic-cancer_gene_census.v85.csv?dl=1")
+tsg = cosmic[ grepl("TSG", cosmic$Role.in.Cancer, ignore.case = T), ]
+oncogene = cosmic[ grepl("oncog", cosmic$Role.in.Cancer, ignore.case = T), ]
+cosmic$Gene.Symbol = as.character(cosmic$Gene.Symbol)
+
+ens = readRDS( paste0( resource, "annotation/gene.detail.rds"))
+goanadb = readRDS( paste0( resource, "/gsea/limma/go_path.rds"))
+
+
+ss = 123
+set.seed(ss)
+
+
+# load the key which also defines where the idat files will be 
+
+
+## this is  for the 850 K 
+### this will include annotations to genes, cpg island, snp etc..  
+ann850k = getAnnotation(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+
+
+# set up a path for your project
+dataDirectory <- "./raw/"
+
+update = 1 
+
+
+kaja = read.table ("LUAD_TSGene.txt", header = T, sep="\t" )
+kaja_og = nrow ( kaja )
+
+```
+
+
+```{r}
+
+if ( update == 1){
+# read in the experimental design and key
+#targets <- read.metharray.sheet(dataDirectory, pattern = "epic_raw.csv")
+targets <- read.csv("./raw/20210603_GenomeStudioSampleSheet_EPIC63_KostyrkoLab_Only.csv", header=T)
+targets$ID = paste0( targets$Sentrix_ID, "_", targets$Sentrix_Position)
+key = openxlsx::read.xlsx("https://www.dropbox.com/s/6oe2aepjfmj5lac/20210503_72h_EPIC_key.xlsx?dl=1")
+setdiff ( key$tube, targets$Subject.ID)
+key = merge ( key, targets, by.x="tube", "Subject.ID")
+key$Basename = key$ID
+key = key [ order ( key$siRNA, key$Cells), ]
+key$Replicate.x = NULL 
+key$Replicate.y = NULL 
+key$Sample.External.ID= NULL 
+key$Subject.External.Key= NULL 
+key$smp_type= NULL 
+key$Sample_Group= NULL 
+key$Pool_ID= NULL 
+key$Number= NULL 
+key$ID= NULL 
+key$Gender = NULL
+# read in the raw data from the IDAT files
+rgSet <- read.metharray.exp(base= dataDirectory, key )
+
+order = colnames ( rgSet)
+all.equal(order, key$Basename)
+setdiff ( key$ID, order)
+setdiff ( order, key$ID )
+
+
+
+
+
+################### QC
+# The method used by minfi to calculate detection p-values compares the total signal
+# (M + U) for each probe to the background signal level, which is estimated from the negative control probes.
+### Very small p-values are indicative of a reliable signal whilst large p-values, for example >0.01, generally
+# indicate a poor quality signal.
+
+# calculate the detection p-values
+# A detection p-value is returned for every genomic position in every sample. Small p-values indicate a good position. Positions with non-significant p-values (typically >0.01) should not be trusted.
+detP <- detectionP(rgSet)
+failed <- detP > 0.01
+colMeans(failed) # Fraction of failed positions per sample
+sum(rowMeans(failed)>0.5) # How many positions failed in >50% of samples?
+# this is how many probes will be eliminated
+failed.probes <- rownames(detP[rowMeans(failed)>0.5,])
+length (failed.probes)
+
+
+pal <- brewer.pal(8,"Dark2")
+
+par(mar=c(10,6,2,0))
+
+# check if we have all the samples 
+all.equal ( key$Basename, colnames ( detP))
+# reorder key 
+
+
+
+# mean of p-value: all samples look good, basically any p > .05 is not good, lower the p.value the better it is. 
+# here  I set the limit to .01 so anything below that is good. 
+qc =  data.frame(
+  name=key$tube ,  
+  value=colMeans(detP),
+  group=key$siRNA
+  )
+
+ccc = getPalette(3)
+names ( ccc) = unique ( key$siRNA)
+
+qc$group = factor ( qc$group, levels=unique ( qc$group))
+qc$name = factor ( qc$name, levels=unique ( qc$name))
+
+pdetect = ggplot(qc, aes( fill=group, y=value, x=name)) + 
+    geom_bar(position="dodge", stat="identity") +
+  theme_bw() +
+        ylab( "p.value") +
+        xlab("")  +
+        theme(legend.position="bottom", legend.title=element_blank(), legend.key = element_blank(),
+              #axis.text.x = element_blank(),
+              #axis.text.y = element_blank(), # comment this out to display cancer.subtype
+              axis.text.y = element_text(size=12),
+              axis.text.x = element_text(size=15),
+              axis.title.x = element_text(size=22),
+              axis.title.y     = element_text(size=22), 
+              legend.text      =element_text(size=12)
+        ) + scale_fill_manual(values =  ccc )
+
+
+
+
+# clean up 
+gc()
+
+# filter out bad samples  (note nothing is removed here) since all the probe seem to be working 
+keep <- colMeans(detP) < 0.05
+rgSet <- rgSet[,keep]
+
+
+
+ 
+# normalize cpg
+mSetSq <- preprocessQuantile(rgSet)
+
+# visualise what the data looks like before and after normalization
+
+#### filter data 
+# ensure probes are in the same order in the mSetSq and detP objects
+detP <- detP[match(featureNames(mSetSq),rownames(detP)),]
+
+# remove any probes that have failed in one or more samples
+keep <- rowSums(detP < 0.01) == ncol(mSetSq)
+# this is how many probes will be removed
+table(keep)
+
+
+mSetSqFlt <- mSetSq[keep,]
+# before 
+dim (mSetSq)
+# after 
+dim (mSetSqFlt)
+
+# remove SNP using minfi
+nosnp <- dropLociWithSnps(mSetSqFlt)
+# after removing snps
+dim (nosnp)
+
+
+# remove unspecific probes 
+# we get the 450 and then the EPIC 
+## cross reactive
+non.spec.450K <- paste0(epic,'/illumina450k_filtering-master/48639-non-specific-probes-Illumina450k.csv') 
+xReactiveProbes <- read.csv(file=non.spec.450K, stringsAsFactors=FALSE)
+## multi-mapped
+multi.map <- read.csv(paste0(epic,'/illumina450k_filtering-master/HumanMethylation450_15017482_v.1.1_hg19_bowtie_multimap.txt'), head = F, as.is = T)
+multi.map.probes <- as.character(multi.map$V1)
+
+filter.probes <- unique ( c( xReactiveProbes$TargetID, multi.map.probes) )
+
+# https://github.com/sirselim/illumina450k_filtering
+# get epic probes now > 100 K from the same github 
+## this file was generate with epic.filter.R in the same dir that combined mulitple epic files 
+epic.filter.probe <-read.table(paste0(epic,"/illumina450k_filtering-master/EPIC/EPIC.badprobes.tsv"), header=TRUE,sep="\t",stringsAsFactors = FALSE,na.strings=".",  quote = "", fill = TRUE)
+
+filter.probes <- unique ( c( filter.probes, epic.filter.probe$x ) )
+
+# this is how many will be remove
+length ( filter.probes)
+keep <- !(featureNames(nosnp) %in% filter.probes)
+nosnp <- nosnp[keep,]
+# final cpg
+dim (nosnp)
+
+
+#The Beta-value has a more intuitive biological interpretation, but the M-value is more statistically valid for the differential analysis of methylation levels. Du et al, 2010
+# http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-11-587
+
+qc =  data.frame(
+  name=key$tube ,  
+  value=colMeans(detP),
+  group=key$siRNA
+  )
+
+ccc = getPalette(3)
+names ( ccc) = unique ( key$siRNA)
+
+qc$group = factor ( qc$group, levels=unique ( qc$group))
+qc$name = factor ( qc$name, levels=unique ( qc$name))
+
+pdetect = ggplot(qc, aes( fill=group, y=value, x=name)) + 
+    geom_bar(position="dodge", stat="identity") +
+  theme_bw() +
+        ylab( "p.value") +
+        xlab("")  +
+        theme(legend.position="bottom", legend.title=element_blank(), legend.key = element_blank(),
+              #axis.text.x = element_blank(),
+              #axis.text.y = element_blank(), # comment this out to display cancer.subtype
+              axis.text.y = element_text(size=12),
+              axis.text.x = element_text(size=15),
+              axis.title.x = element_text(size=22),
+              axis.title.y     = element_text(size=22), 
+              legend.text      =element_text(size=12)
+        ) + scale_fill_manual(values =  ccc )
+
+
+
+
+cpg.m.after <- getM(nosnp) 
+cpgBeta.after <- getBeta(nosnp)
+
+
+
+# prepare for geo 
+# last to use rgset is here. 
+# mSetSq <- preprocessQuantile(rgSet)
+MSet.raw <- preprocessRaw(rgSet)
+head(getMeth(MSet.raw)[,1:3])
+head(getUnmeth (MSet.raw)[,1:3])
+
+detP[1:3, 1:3 ]
+
+saveRDS( list (
+  cpg.m.after = cpg.m.after,
+  cpgBeta.after = cpgBeta.after, 
+  qc = qc ,
+  key = key, 
+  detP=detP, 
+  MSet.raw = MSet.raw, 
+  meta = "updated, 3-8-2022, includes pvalue and MSet.raw, use getMeth or getUnmeth to extract values"
+  
+  
+), 
+         
+         "DATA2.rds")
+
+
+
+options(scipen=0)
+
+
+# reorder key by sample name 
+key2 = key [gtools::mixedorder(key$tube)  , ]
+
+g = cpgBeta.after[ , key2$Basename]
+p = detP[ , key2$Basename]
+
+all.equal(key2$Basename, colnames ( g))
+all.equal(key2$Basename, colnames ( p))
+# replacing ugly names with tube numbers 
+# wanted to be sure so use sapply instead just setting colnames to key$tube 
+colnames ( g ) = as.character ( sapply( colnames ( g), function(x) key[key$Basename == x, ]$tube ) )
+colnames ( p ) = as.character ( sapply( colnames ( p), function(x) key[key$Basename == x, ]$tube ) )
+
+# the format is sample_id and p.value , sample_id p.value 
+# so the issue is the that the name are repeated, thus would need to convert to matrix first 
+
+geo = merge ( g, p, by="row.names")
+row.names ( geo ) = geo$Row.names
+geo$Row.names= NULL 
+colnames ( geo ) = gsub ( ".x", "", colnames ( geo ))
+colnames ( geo ) = gsub ( ".y", ".pval", colnames ( geo ))
+
+geo = geo [ , gtools::mixedsort (colnames ( geo ) )]
+geo$ID_REF = row.names ( geo )
+geo = geo[ , unique ( c( "ID_REF", colnames ( geo )))]
+
+#test = head ( as.matrix ( geo ))
+#colnames ( test) = gsub ( ".*.pval", "Detection Pval", colnames ( test ))
+
+test = as.matrix ( geo )
+colnames ( test) = gsub ( ".*.pval", "Detection Pval", colnames ( test ))
+
+write.table(test,paste0(out.dir,"geosubmit.tsv"), sep = "\t", row.names = FALSE ,quote=FALSE)
+
+
+mdt = system ( paste0("md5sum ", out.dir,"geosubmit.tsv") , intern = T ) 
+
+
+
+
+# get name of idat files 
+idat = list.files("./raw", pattern=".idat")
+
+
+
+idat = data.frame ( file=idat[grepl ( "Grn", idat)],    
+                    file2=idat[grepl ( "Red", idat)])
+idat$Basename = gsub ( "_Grn.idat", "", idat$file )
+
+key2 = merge ( key2, idat, by="Basename")
+key2 = key2[!duplicated ( key2$Basename) , ]
+key2 = key2[!duplicated ( key2$file), ]
+
+# get checksum 
+# system (  "md5sum ./raw/* > ./raw/checklist.chk")
+# don't worry about warning 
+df2 = read.table ( "./raw/checklist.chk", sep=" ", header=F)
+df2$V2 = NULL 
+df2 = df2[ grepl ( "_R", df2$V3), ]
+df2$V3 = gsub ( ".*\\/", "", df2$V3)
+colnames ( df2 ) = c("md5sum","filename")
+
+df2 = rbind ( df2, c(   unlist ( str_split(mdt, "  ") ) [1] , "geosubmit.tsv" ) )
+
+
+write.table(df2,paste0(out.dir,"md5sum.tsv"), sep = "\t", row.names = FALSE ,quote=FALSE)
+
+
+key2$title = paste0( key2$siRNA, "_", key2$Cells, "_", key2$tube)
+
+
+wb_geo <- createWorkbook()
+
+
+
+
+
+addWorksheet(wb_geo, 'key')
+writeData(wb_geo, 'key' , key2  , rowNames=F  )
+
+
+
+
+saveWorkbook(wb_geo, file = paste0(out.dir,"geosubmit.xlsx"), overwrite = TRUE)
+
+
+
+
+} else {
+  data = readRDS("DATA2.rds" )
+  cpg.m.after = data$cpg.m.after
+  cpgBeta.after = data$cpgBeta.after 
+  qc = data$qc 
+  
+}
+
+
+
+```
+
+
+
+```{r}
+# make sure that the order of target and cpg samples are the same. 
+
+all.equal( colnames(cpg.m.after), key$Basename ) 
+all.equal( colnames(cpgBeta.after),key$Basename ) 
+
+# remove NA / incomplete rows 
+nrow ( cpg.m.after)
+cpg.m.after <- cpg.m.after[complete.cases(cpg.m.after), ]
+cpgBeta.after <- cpgBeta.after[complete.cases(cpgBeta.after), ]
+
+
+
+# calculate cell poportions 
+
+ref.m <- centDHSbloodDMC.m
+cell.porportion <- epidish( cpgBeta.after , ref.m, method = "RPC")
+boxplot(cell.porportion$estF)
+cp <- cell.porportion$estF
+# rename the id to make it look better 
+#cp = merge ( cp, key, by.x="row.names", "Basename")
+cp.table <- cp
+cp <- melt (cp)
+colsingl <- getPalette ( length (  unique ( cp$X2 )  )) 
+
+cell_portion = ggplot(cp, aes(x = X2, y = value, fill = X2)) + 
+  geom_bar(stat = "identity") +
+   theme(legend.position="bottom", legend.title=element_blank(), legend.key = element_blank(),
+        axis.text.x = element_text(angle = 90, size=10),
+        axis.text.y = element_text(size=15.5), panel.background = element_blank()
+  ) + ggtitle( " cell porportion ") +
+   scale_fill_manual(values = colsingl  ) 
+ 
+cp.table <- round( cp.table , digits = 4)
+
+
+
+cp2 = merge ( key, cp, by.x="Basename", by.y="X1")
+
+
+
+
+
+cell_type_group = ggplot(cp2, aes(y=value, x=X2)) +
+    geom_violin()+ 
+    geom_jitter(shape=19, position=position_jitter(0.07), aes( colour=siRNA), size=4 ) +
+    theme_bw() +
+    ylab(" ") +
+    xlab("") +
+    theme(legend.position="none", legend.title=element_blank(), legend.key = element_blank(),
+          
+          axis.text.y = element_text(size=12),
+          axis.text.x = element_text(angle = 90, size=11.5),
+          axis.title.x = element_text(size=22),
+          
+          axis.title.y     = element_text(size=22), 
+          legend.text      =element_text(size=12)
+    ) + stat_summary(fun.y = mean, fun.ymin = mean, fun.ymax = mean,
+                     geom = "crossbar", width = .5) + scale_colour_manual(values=ccc) +
+    facet_grid(~siRNA) 
+
+
+targets = key 
+
+```
+
+
+# Data {.tabset}
+
+## Key 
+
+```{r, message=FALSE, warning=FALSE,fig=TRUE,fig.width=10, fig.height=10, echo=FALSE, include=TRUE}
+
+kable( key  , format = "html" , row.names = F, caption = "All samples" ) %>% kable_classic(full_width = F, position = "center")
+```
+
+## Cell Type Proportion {.tabset}
+
+  * checking cell type compositions.
+  __SINCE this is cell lines this portion is not useful__
+
+### Plot
+
+```{r, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+cell_portion
+```
+
+### compare 
+
+```{r, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.width=10, fig.height=6}
+cell_type_group
+```
+
+
+
+
+```{r}
+
+# subset the correct values 
+#The Beta-value has a more intuitive biological interpretation, but the M-value is more statistically valid for the differential analysis of methylation levels. Du et al, 2010
+# http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-11-587
+
+c_key = key 
+c_key$sample = key$Basename
+c_key$Group = key$siRNA
+
+mv = cpg.m.after[ , c_key$sample] 
+bv = cpgBeta.after [ , c_key$sample] 
+
+## this is  for the 850 K 
+### this will include annotations to genes, cpg island, snp etc..  
+ann850k = getAnnotation(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+
+ann850kSub <- ann850k[match(rownames(mv),ann850k$Name),
+c(1:4,12:19,24:ncol(ann850k))]
+
+
+
+```
+
+```{r}
+
+if ( update == 1){
+modcombat2 <- model.matrix (~1, data= key )
+
+mvc =  ComBat(dat=as.matrix(mv ), batch=key$Cells, mod=modcombat2, par.prior=TRUE, prior.plots=FALSE)
+mvc =  data.frame ( mvc)
+colnames ( mvc ) = gsub ( "^X", "",colnames ( mvc))
+
+bvc =  ComBat(dat=as.matrix(bv ), batch=key$Cells, mod=modcombat2, par.prior=TRUE, prior.plots=FALSE)
+bvc =  data.frame ( bvc)
+colnames ( bvc ) = gsub ( "^X", "",colnames ( bvc))
+
+saveRDS( list ( mvc=mvc, bvc=bvc
+  ), "mod.rds")
+
+}else {
+  temp = readRDS("mod.rds")
+  mvc = temp$mvc
+  bvc = temp$bvc
+}
+
+
+
+# unsupervised pca 
+dir.create(input_dir)
+if ( update == 1){
+  mad <- apply (mvc, 1,  mad  )
+  mad <- sort ( mad, decreasing = T)
+  saveRDS( mad, paste0(input_dir, "mad.rds")   )
+}else {
+  mad = readRDS( paste0(input_dir, "mad.rds") )
+}
+
+top1 = ceiling (  length ( mad ) * .01 )
+
+
+
+m.cpm = mvc [ row.names ( mvc) %in% names(mad)[1:10000]  , c_key$sample ]
+
+
+###
+
+
+
+
+### 
+set.seed(123)
+umap_r = umap(t( m.cpm ))
+
+
+
+
+df2 <- data.frame(x = umap_r$layout[,1],
+                 y = umap_r$layout[,2],
+               group =c_key$Group ,
+               cell = c_key$Cells   
+                 )
+
+labelT = data.frame ( x=c(-1), y=c(5), group = c("siUHRF1"), label=c("siUHRF1"), cell="A549")
+
+
+
+ um1 = ggplot(df2, aes(x, y, colour = group, shape=cell )) +
+  geom_point(size=12, alpha=.8) +
+     theme_minimal()   + xlab("UMAP 1") + ylab ( "UMAP 2 ") +
+  theme(legend.position="bottom",  legend.key = element_blank(),
+          
+          axis.text.y = element_text(size= 15 ),
+          #axis.text.x = element_blank(),
+          axis.title.x = element_text(size=20),
+          
+          axis.title.y     = element_text(size=20), 
+          legend.text      =element_text(size=12)
+    ) + scale_colour_manual(values=ccc) + geom_text_repel(data = labelT, aes(label = label), size=15 , show.legend=FALSE )
+
+
+
+
+
+### tsne 
+set.seed(123)
+tsne_out <- Rtsne( t(m.cpm)  ,  perplexity = 5 ) # Run TSNE
+
+df1 <- data.frame(x = tsne_out$Y[,1],
+                 y = tsne_out$Y[,2],
+                    group =c_key$Group 
+                 
+                 )
+
+
+labelT = data.frame ( x=c(-15, 15), y=c(0,-5), group = c("M","C"), label=c("moyamoya", "control"))
+
+
+
+tsne1 = ggplot(df1, aes(x, y, shape = group )) +
+  geom_point(size=12, alpha=.8, stroke=3) +
+     theme_minimal()   + xlab("tSNE 1") + ylab ( "tSNE 2 ") +
+  theme(legend.position="bottom",  legend.key = element_blank(),
+          
+          axis.text.y = element_text(size= 15 ),
+          #axis.text.x = element_blank(),
+          axis.title.x = element_text(size=20),
+          
+          axis.title.y     = element_text(size=20), 
+          legend.text      =element_text(size=12)
+    ) + scale_colour_manual(values=ccc) 
+
+```
+
+```{r}
+
+scpm = scale ( data.matrix(m.cpm) ) 
+
+kaja_colors = c()
+kaja_colors[[ 'siKRAS' ]] = '#F8766D'
+kaja_colors[[ 'siUHRF1' ]] = '#619CFF'
+kaja_colors[[ 'siNeg' ]] = '#999999'
+
+annt.color = list()
+annt.color[['group']] = kaja_colors
+# sanity check 
+all.equal( names ( m.cpm ), c_key$sample )
+
+topannt = HeatmapAnnotation( 
+                              group = c_key$Group
+                              ,col =  annt.color 
+                            , show_legend =  T,  simple_anno_size = unit(1.5, "cm")
+                          
+) 
+
+
+
+
+
+km2=2
+
+temp = m.cpm 
+colnames ( temp ) = make.unique(  paste ( c_key$siRNA) )
+dend2 = makehr ( t( temp ), km=1
+                 , dist.this = "euclidean", aggreg= "ward.D2", meta1 = c_key$Group )    
+dend2$dend = dend2$dend %>% set("labels_cex", 0) %>% set("labels_col", "white")
+
+plot ( sort ( dend2$dend)   )
+
+
+heat1 = ComplexHeatmap::Heatmap(  data.matrix(m.cpm)  
+           ,  name = "Methylation"
+           , show_row_dend = T
+           , show_column_names = F
+           , show_row_names = F
+           #, name= heat.title
+           ,column_split = 2
+           ,top_annotation = topannt
+           #, col = pals::brewer.rdylbu(25) 
+           , col =  colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlBu")))(25)
+           #, cluster_columns = sort ( dend2$dend , decreasing = T)
+           #, column_split = 2
+            , cluster_columns  = sort ( dend2$dend) 
+           #, row_split = 7
+           ,row_title = NULL
+           ,column_title = NULL
+         ,show_heatmap_legend = T
+         , row_names_gp = grid::gpar(fontsize = 14) 
+          ,heatmap_legend_param = list(legend_height  =unit(6, "cm")  , labels_gp = gpar(col = "black", fontsize = 14) )
+     
+         #, clustering_distance_columns = "spearman"
+)
+
+
+
+```
+
+## Unsupervised Clustering {.tabset}
+
+
+  * CpG profiling  shown in a two-dimensional tSNE plot. Each dot represents a sample. 
+  * The top 10000 of most variable cpgs (on the basis of median absolute deviation) were selected and processed by the UMAP algorithm
+
+### UMAP 
+
+```{r, message=FALSE, warning=FALSE,fig=TRUE,fig.width=10, fig.height=7, echo=FALSE, include=TRUE}
+
+um1
+
+```
+
+
+### Heatmap 
+
+```{r, message=FALSE, warning=FALSE,fig=TRUE,fig.width=10, fig.height=7, echo=FALSE, include=TRUE}
+
+draw ( heat1 )
+
+paper_fig = "/projects/lab.mis/kaja/epic/paper_fig"    
+dir.create(paper_fig)
+
+
+pdf(paste0(paper_fig, "/unsup_heat.pdf"), width=12.5, height=12.3)
+
+draw ( heat1 )
+
+dev.off()
+
+```
+
+
+
+```{r}
+# differential expression 
+# 
+group <- factor(c_key$Group)
+cell <- factor ( c_key$Cells)
+
+
+
+design <- model.matrix(~0+group + cell   , data=c_key)
+colnames ( design) = gsub ( 'group',"",colnames(design))
+colnames ( design) = make.names ( colnames ( design) )
+
+# fit the linear model
+fit <- lmFit(mvc, design)
+# create a contrast matrix for specific comparisons
+contMatrix <- makeContrasts(
+  siKRAS=siKRAS - siNeg
+  ,siUHRF1=siUHRF1-siNeg 
+  ,siUHRF1k = siUHRF1 - siKRAS
+  , levels=design)
+# fit the contrasts
+fit2 <- contrasts.fit(fit, contMatrix)
+fit2 <- eBayes(fit2)
+summary(decideTests(fit2))
+
+
+
+
+result_uhrf1 <- topTable(fit2, num=Inf, coef="siUHRF1", genelist=ann850kSub)
+result_kras <- topTable(fit2, num=Inf, coef="siKRAS", genelist=ann850kSub)
+
+
+hist ( result_uhrf1$adj.P.Val, breaks= seq(0,1,.05) )
+hist ( result_kras$adj.P.Val, breaks= seq(0,1,.05) )
+
+dim (result_kras[result_kras$adj.P.Val < .7 & result_kras$P.Value < .001 & abs ( result_kras$logFC) > .5 , ] )
+dim (result_uhrf1[result_uhrf1$adj.P.Val < .05 & abs ( result_uhrf1$logFC) > 1.5 & result_uhrf1$P.Value < .001  , ] )
+
+
+key_uhrf1 = c_key[ c_key$siRNA %in% c("siUHRF1","siNeg" ), ]
+
+result_uhrf1 <- merge( result_uhrf1 , bvc [ , key_uhrf1$sample ] , by="row.names" )
+colnames( result_uhrf1   )[1] <- "gene"
+
+key_kras = c_key[ c_key$siRNA %in% c("siKRAS","siNeg" ), ]
+result_kras <- merge( result_kras , bvc [ , key_kras$sample ] , by="row.names" )
+colnames( result_kras   )[1] <- "gene"
+
+
+rsub <- colnames(result_uhrf1 )[1:which ( colnames ( result_uhrf1) == "B")]
+
+result = list ()
+
+result$uhrf1$result = result_uhrf1
+result$uhrf1$fdr = .05 
+result$uhrf1$pv = .001
+result$uhrf1$logfc = 1.5
+result$uhrf1$key = key_uhrf1
+result$uhrf1$exp = c ( exp="siUHRF1", control="siNeg" )
+result$uhrf1$title = " siUHRF1_vs_siNeg"
+
+result$kras$result = result_kras
+result$kras$fdr = .7 
+result$kras$pv = .001
+result$kras$logfc = .5
+result$kras$key = key_kras
+result$kras$exp = c ( exp="siKRAS", control="siNeg" )
+result$kras$title = " siKRAS_vs_siNeg"
+
+for ( res in names ( result )){
+
+post = plot.post ( result.gene= result[[res]]$result  , g1="Group", g2="Group" 
+                             , new.key=result[[res]]$key, r.sub=rsub, exp.group='Group'
+                             , exp.this=as.character ( result[[res]]$exp['exp'] )
+                              , normal.this= as.character ( result[[res]]$exp['control'] )
+                             , sample.id="sample"
+                             , GENE_SYMBOL = "gene"
+                             , fdr= result[[res]]$fdr
+                            , p.val =result[[res]]$pv
+                             , fold_thres = result[[res]]$logfc
+                            , title1 = paste ( as.character ( result[[res]]$exp['exp'] ), "vs", as.character ( result[[res]]$exp['control'] )  )
+                            #, top10 = top10
+                            , normal.color = "#d442f5"
+                           , exp.color = "#ebeced"
+                           ,samp_dist = "euclidean"
+                           ,gene_dist = "spearman"
+                           ,samp_clust = "ward.D2"
+                           ,heat.title = "BV "
+                           ,heat.color = colorRampPalette(c( "#0f6af2","yellow","red"))(1024) # colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlBu")))(100)
+                           ,rsplit = 2
+                           ,csplit =2
+                           ,pcalabel = 0
+                           ,cname = FALSE
+                           #, human = ens
+                       , gene.name = "external_gene_name"
+                       , gene.id = "entrezgene_id"
+                       #, km = km
+                       #, elevel = elevel
+                       
+                            )
+
+
+post$pca.unc
+
+post$d.filter = post$data [ post$data$GencodeBasicV12_NAME != "" & post$data$class != "no-change", ]
+colnames ( post$d.filter )[1] = "CpgProbe"
+
+
+
+# split into different rows for each gene. This will create probe duplicates! 
+post$d.filter  = post$d.filter %>% dplyr::group_by(CpgProbe) %>% 
+    mutate(gene = paste ( unique ( unlist ( strsplit(as.character(GencodeBasicV12_NAME), ";")) ), collapse = ";")  )%>% # string split to unique  first
+     mutate(gene = strsplit(as.character(gene), ";")  )   %>% # keep list afters string split to unnest into new rows. 
+    unnest(gene)     %>% data.frame(stringsAsFactors = F)
+              
+# reorganize to make pretty 
+cname = colnames (post$d.filter )
+stat1 = which ( cname == "logFC" )
+stat2 = which ( cname == "B")
+statn = cname[stat1:stat2]
+aven = cname [ grepl (".ave", cname)]
+post$d.filter  = post$d.filter [ , unique ( c ( "gene", "CpgProbe", "class", aven, statn, cname ))]
+
+post$allcpg = unique ( post$d.filter$CpgProbe )
+
+
+# remove conflicting genes that are both up and down. 
+
+
+conflict = post$d.filter %>%
+  group_by(gene) %>% 
+  filter(n_distinct(class) != 1) %>%
+  ungroup %>% data.frame(stringsAsFactors = F)
+
+post$d.filter = post$d.filter %>%
+  group_by(gene) %>% 
+  filter(n_distinct(class) == 1) %>%
+  ungroup %>% data.frame(stringsAsFactors = F)
+
+# count how many times occurance set that to cpgN 
+
+post$d.filter  = post$d.filter %>% dplyr::group_by(gene) %>% 
+    mutate(cpg_total = n()  )%>%data.frame(stringsAsFactors = F)
+
+post$d.filter  = post$d.filter [ , unique ( c ( "gene", "CpgProbe", "class","cpg_total", aven, statn, cname ))]
+
+# remove duplicates but keep the highest absolute version 
+post$allcpg = post$d.filter$CpgProbe
+
+temp = post$d.filter [ order ( abs(post$d.filter$logFC), decreasing = T), ]
+temp = temp [!duplicated ( temp$gene), ]
+#View ( temp [ temp$cpg_total > 1, ])
+post$d.filter = temp 
+
+# replot with tsne 
+
+set.seed(123)
+tsne_out <- Rtsne( t(bvc[post$allcpg  ,  result[[res]]$key$sample ]   ), perplexity = 1  ) # Run 
+
+
+
+df1 <- data.frame(x = tsne_out$Y[,1],
+                 y = tsne_out$Y[,2],
+                    group =as.character ( result[[res]]$key$Group )
+                 
+                 )
+ 
+post$tsne =  ggplot(df1, aes(x, y, shape = group )) +
+  geom_point(size=12, alpha=.8, stroke=3) +
+     theme_minimal()   + xlab("tSNE 1") + ylab ( "tSNE 2 ") +
+  theme(legend.position="bottom",  legend.key = element_blank(),
+          
+          axis.text.y = element_text(size= 15 ),
+          #axis.text.x = element_blank(),
+          axis.title.x = element_text(size=20),
+          
+          axis.title.y     = element_text(size=20), 
+          legend.text      =element_text(size=12)
+    ) 
+
+
+
+
+
+# perform GSEA 
+
+
+
+cpg.pval =   result[[res]]$result$P.Value
+names ( cpg.pval ) =   result[[res]]$result$gene
+
+
+
+
+
+go1 = methylRRA(cpg.pval = cpg.pval, method = "GSEA", 
+                    minsize = 50, maxsize = 500, GS.type= c( "GO"), array.type = "EPIC"  )
+ 
+kegg1 = methylRRA(cpg.pval = cpg.pval, method = "GSEA", 
+                    minsize = 50, maxsize = 5000, GS.type= c( "KEGG"), array.type = "EPIC"  )
+reactome1 = methylRRA(cpg.pval = cpg.pval, method = "GSEA", 
+                    minsize = 50, maxsize = 5000, GS.type= c( "Reactome"), array.type = "EPIC"  )
+
+head(go1, 10)
+head(kegg1, 10)
+head(reactome1, 10)
+
+
+
+post$gsea$go = plot.gsea_meth (go1[ go1$pvalue < .05 & go1$padj < .05, ], 12)
+post$gsea$kegg = plot.gsea_meth (kegg1[ kegg1$pvalue < .05 & kegg1$padj < .05, ], 12)
+post$gsea$reactome = plot.gsea_meth (reactome1[ reactome1$pvalue < .05 & reactome1$padj < .05, ], 12)
+
+
+# perform path enrichment 
+
+all_gene = unique ( post$data$GencodeBasicV12_NAM )
+all_gene = all_gene[all_gene!=""]
+all_gene = sort ( unique ( unlist ( strsplit(as.character(all_gene), ";")) ) )
+
+post$hyper = get.enrich4 (
+        g =  post$d.filter
+        ,refdb = ens
+        ,g.name="gene"
+        , m.name="external_gene_name"
+        ,e.name="entrezgene_id"
+        , logFC= "logFC"
+        ,species="Hs"
+        ,bg = all_gene
+        ,fdr=.05
+        ,goana_db=goanadb
+        , total_annt = 0  # how many rows to return with genes responsible for the enrichment
+    
+    ) 
+
+result[[res]]$post = post 
+
+
+
+### extra study plots 
+
+
+## plot top variability 
+
+
+
+
+df = bvc [  result[[res]]$post$d.filter$CpgProbe[1:10]  ,result[[res]]$key$sample  ]
+df = melt ( as.matrix ( df ) )
+colnames ( df ) = c("CpgProbe", "sample", "value")
+
+
+df = merge ( df, result[[res]]$post$d.filter [ , c("CpgProbe", "gene") ], by="CpgProbe" )
+df$sample = as.character ( df$sample)
+df = merge ( df, result[[res]]$key[ , c("sample", "Group")], by="sample")
+df$gene = paste ( df$CpgProbe, df$gene)
+
+result[[res]]$post$varplot = ggplot( df, aes(y=value, x=Group)) +
+  geom_violin()+ 
+  geom_jitter(shape=19, position=position_jitter(0.07), aes( colour=Group), size=1 ) +
+  theme_bw() +
+  ylab(" ") +
+  xlab("") +
+  theme(legend.position="none", legend.title=element_blank(), legend.key = element_blank(),
+        
+        axis.text.y = element_text(size=12),
+        axis.text.x = element_text(angle = 90, size=11.5),
+        axis.title.x = element_text(size=22),
+        
+        axis.title.y     = element_text(size=22), 
+        legend.text      =element_text(size=12)
+  ) + stat_summary(fun.y = mean, fun.ymin = mean, fun.ymax = mean,
+                   geom = "crossbar", width = .5) + scale_colour_manual(values=ccc) +
+  facet_wrap(~gene, ncol = 3 , scales = "free"  ) 
+
+
+
+# plot variability top 50 
+
+
+cpgplot = result[[res]]$post$data [ result[[res]]$post$data$class != "no-change", ]$gene
+dfc = bvc [  cpgplot[1:50] ,result[[res]]$key[result[[res]]$key$Group == result[[res]]$exp["control"], ]$sample  ]
+dfm = bvc [  cpgplot[1:50]  ,result[[res]]$key[result[[res]]$key$Group == result[[res]]$exp["exp"], ]$sample  ]
+
+dfc = apply ( dfc, 1, function (x) mean(x))
+dfc = data.frame ( cpg=names ( dfc), cv=as.numeric ( dfc ))
+dfc$group = result[[res]]$exp["control"]
+dfm = apply ( dfm, 1, function (x)  mean (x))
+dfm = data.frame ( cpg=names ( dfm), cv=as.numeric ( dfm ))
+dfm$group = result[[res]]$exp["exp"]
+
+dfh = rbind ( dfm, dfc)
+
+dfh = reshape(dfh, idvar = "group", timevar = "cpg", direction = "wide")
+row.names ( dfh ) = dfh$group
+dfh$group = NULL
+
+
+
+
+
+dfh = rbind ( dfm, dfc)
+dfh = dfh [ order ( dfh$cv, decreasing = T), ]
+dfh$cpg = factor ( dfh$cpg, levels= unique ( dfh$cpg))
+
+dfh$lcpg = log2 ( dfh$cv)
+result[[res]]$post$top50_line <-ggplot(dfh, aes(x=cpg, y=cv, group=group)) +
+  geom_line( )+
+  geom_point(aes(shape=group), size=1, stroke=1)+ scale_shape_manual(values = c(2, 19))  +
+  theme_minimal()   + xlab("") + ylab ( "median beta") +
+  theme(legend.position="right",  legend.key = element_blank(),
+        
+        axis.text.y = element_text(size= 15 ),
+        axis.text.x = element_blank(),
+        #axis.title.x = element_text(size=20),
+        
+        axis.title.y     = element_text(size=20), 
+        legend.text      =element_text(size=12)
+  ) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black")) 
+
+
+dfh$group = factor (dfh$group, levels=  c ( as.character ( result[[res]]$exp[ "control"] ) ,  as.character ( result[[res]]$exp[ "exp"] )) )  
+
+result[[res]]$post$top50_bar = ggplot(dfh, aes(x=cpg, y=cv, fill=group)) +
+  geom_bar(position="stack", stat="identity") +
+  theme_minimal()   + xlab("") + ylab ( "average beta") +
+  theme(legend.position="right",  legend.key = element_blank(),
+        
+        axis.text.y = element_text(size= 25 ),
+        #axis.text.x = element_text(size= 25 , angle=90),
+        axis.text.x = element_blank(),
+        axis.title.x = element_text(size=25),
+        
+        axis.title.y     = element_text(size=20), 
+        legend.text      =element_text(size=12)
+  ) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black")) +scale_fill_manual(values=ccc) + ggtitle ( "top 50 significant")
+
+
+
+
+
+### how many up and how many down? 
+### 
+
+freqvar2 = data.frame ( table ( result[[res]]$post$d.filter[result[[res]]$post$d.filter$class == "up", ]$chr) )
+colnames ( freqvar2 ) = c( "Chr", "Freq")
+freqvar2 = freqvar2 [ order ( freqvar2$Freq, decreasing = T), ]
+freqvar2$class = "up"
+
+
+freqvar = data.frame ( table ( result[[res]]$post$d.filter[result[[res]]$post$d.filter$class == "down", ]$chr) )
+colnames ( freqvar ) = c( "Chr", "Freq")
+freqvar = freqvar [ order ( freqvar$Freq, decreasing = T), ]
+freqvar$class = "down"
+
+freqvar = rbind ( freqvar, freqvar2)
+
+
+freqvar$Chr = factor ( freqvar$Chr, levels=c(paste0 ( "chr",seq ( 1, 22) ), "chrX", "chrY")  )
+
+
+
+result[[res]]$post$sig_chr = ggplot(freqvar, aes(Chr, Freq, fill=class)) +   
+  geom_bar(position="stack", stat="identity") +
+  theme_minimal()   + xlab("") + ylab ( "Freqeuncy") +
+  theme(legend.position="right",  legend.key = element_blank(),
+        
+        axis.text.y = element_text(size= 25 ),
+        axis.text.x = element_text(size= 25 , angle=90),
+        #axis.text.x = element_blank(),
+        axis.title.x = element_text(size=25),
+        
+        axis.title.y     = element_text(size=20), 
+        legend.text      =element_text(size=12)
+  ) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black")) +scale_fill_manual(values=c(up="#c2684f",down="#6fab57") ) + ggtitle ( "ratio by chromosome")
+
+
+}
+
+
+# running one off test 
+if ( 1 > 2){
+  
+   overlap = 80
+ list1 = 359+80
+ PopSize = length ( all_gene )  
+ list2 = 80+16 
+ 
+ 
+ phyper( ( overlap-1 ) , list1 ,  ( PopSize-list1 ) ,list2,lower.tail = FALSE, log.p = FALSE)
+ 
+}
+
+```
+
+
+```{r}
+DT::datatable(NULL)
+
+```
+
+
+## CPG (Probe-wise) differential methylation {.tabset}
+
+
+```{r fig=TRUE,fig.width=12, fig.height=9, echo=FALSE, include=TRUE, results='asis' }
+library  ( patchwork)
+do.this = c (   "tsne"    , "volcano" , "scatter",  "ma"        )
+bubble_up = data.frame ()
+bubble_down = data.frame()
+
+for (nm in names(result) ){
+
+  
+
+ 
+ 
+ cat("### ", nm ,  " {.tabset} \n\n " )
+  
+cat('\n\n')
+ 
+
+
+cat("#### ", nm, "Stats", " \n * red lines define DEG cutoffs  \n\n " )
+
+print (  result[[nm]]$post$hist$p.value +  result[[nm]]$post$hist$logfc + result[[nm]]$post$hist$fdr  )
+
+cat('\n\n')
+cat ( "\n")
+
+
+cat("#### ", nm, "DEG Table", " \n * Showing only DEG genes. See Excel for full set \n\n " )
+ 
+print(htmltools::tagList(  DT::datatable( result[[nm]]$post$d.filter , rownames = F, filter= list ( position="top", clear = FALSE )  
+                                , extensions = 'Buttons'
+                                      , options = list(dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel', 'pdf', 'print')
+                                                 , autoWidth = T
+                                                 , scrollX=T, className = 'dt-left') )  )  )
+
+cat('\n\n')
+
+
+
+
+  for ( p in c ( do.this)){
+    
+    cat("#### ", p, " \n")
+    print ( result[[nm]]$post[[p]]  )
+    cat('\n\n')
+    
+  }
+
+
+cat('\n\n')
+
+
+cat("#### ", "hm", " \n")
+    print ( result[[nm]]$post$mds  )
+    cat('\n\n')
+    
+  cat("#### ", "", " \n")
+    print ( result[[nm]]$post$hm  )
+    cat('\n\n')  
+    
+    
+    
+
+
+cat("#### ", nm, "GSEA", " {.tabset} \n * We break it up by canonical and GO \n\n " )
+
+cat ("\n")
+
+for ( gg in   names ( result[[nm]]$post$gsea )  ) {
+    
+    if ( nrow ( result[[nm]]$post$gsea[[gg]]$df) == 0 ){
+      next
+    }
+      
+  
+    cat("##### ", gg, " \n")
+    print ( result[[nm]]$post$gsea[[gg]]$plot  )
+    cat('\n\n')
+    
+    # combine up and down for later bubble plots 
+    
+    result[[nm]]$post$gsea[[gg]]$df$group = result[[nm]]$title
+    bubble_up = rbind ( result[[nm]]$post$gsea[[gg]]$df )
+    
+    
+    
+    # get annotated leading ednge 
+
+     cat("##### Table ", gg, " \n")
+    print(htmltools::tagList(  DT::datatable(  result[[nm]]$post$gsea[[gg]]$df , rownames = F, filter= list ( position="top", clear = FALSE )  
+                                , extensions = 'Buttons'
+                                      , options = list(dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel', 'pdf', 'print')
+                                                 , autoWidth = F
+                                                 , scrollX=T, className = 'dt-left') )  )) 
+     cat('\n\n')
+    
+     addWorksheet(wb, paste0(nm, "_", gg,"_GSEA") )
+     writeData(wb, paste0(nm, "_", gg,"_GSEA"),  result[[nm]]$post$gsea[[gg]]$df )
+     
+}
+
+
+cat('\n\n')
+
+
+
+
+cat("#### ", nm, "Over-representation Analysis", " {.tabset} \n\n\n" )
+
+cat ("\n")
+
+for ( gg in c ( names ( result[[nm]]$post$hyper$df)  )){
+    
+    cat("##### ", gg, " \n")
+    print ( result[[nm]]$post$hyper$plots[[gg]]$plot  )
+    cat('\n\n')
+    
+    
+    cat("##### Table ", gg, " \n")
+    print(htmltools::tagList(  DT::datatable(  result[[nm]]$post$hyper$df[[gg]], rownames = F, filter= list ( position="top", clear = FALSE )  
+                                , extensions = 'Buttons'
+                                      , options = list(dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel', 'pdf', 'print')
+                                                 , autoWidth = F
+                                                 , scrollX=T, className = 'dt-left') )  )) 
+     cat('\n\n')
+     
+     addWorksheet(wb, paste0(nm, "_", gg,"_ORA") )
+     writeData(wb, paste0(nm, "_", gg,"_ORA"),  result[[nm]]$post$hyper$df[[gg]] )
+     
+     
+}
+
+
+
+cat('\n\n')
+
+
+
+
+}
+
+```
+
+```{r}
+pdf(paste0(paper_fig, "/uhrf_hallmark.pdf"), width=8, height=6)
+print ( result[["uhrf1"]]$post$hyper$plots[["HALLMARK"]]$plot  + ggtitle ( "Top Hallmark Pathways"))
+dev.off()
+
+
+
+```
+
+
+```{r}
+# study global changes 
+# study by gene or cpg 
+
+
+### 
+
+bv_u = melt ( as.matrix ( bvc [   ,c_key[c_key$Group == "siUHRF1", ]$sample  ] ) )
+bv_k = melt ( as.matrix ( bvc [    ,c_key[c_key$Group == "siKRAS", ]$sample  ] ) )
+bv_c = melt ( as.matrix ( bvc [    ,c_key[c_key$Group == "siNeg", ]$sample  ] ) )
+
+bv_u$group = "siUHRF1"
+bv_k$group = "siKRAS"
+bv_c$group = "siNeg"
+
+
+dfh = rbind ( bv_u, bv_k)
+dfh = rbind ( dfh ,bv_c )
+
+dfh = merge ( dfh, ann850kSub [ , c("chr", "pos", "Relation_to_Island")], by.x = "X1", by.y="row.names")
+
+dfh2 = data.frame ( dfh ) %>% dplyr::group_by(group, chr ) %>% 
+  dplyr::summarise(cov = median ( value)  ) %>% 
+  data.frame(stringsAsFactors = F)
+
+dfh2$chr = factor ( dfh2$chr, levels= c(paste0 ( "chr",seq ( 1, 22) ), "chrX", "chrY"))
+
+
+min = min ( dfh2$cov) 
+max = max ( dfh2$cov) 
+
+bar_global_cpg = ggplot(dfh2, aes(fill=group, y=cov, x=chr)) + 
+  geom_bar(position="dodge", stat="identity") + scale_fill_manual(values=ccc) + ylab ( "median beta/chr ") +
+  theme_minimal() +
+  theme(
+    panel.grid = element_blank()
+    ,panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank()
+    
+  )  + 
+  theme(legend.position="right",  legend.key = element_blank(),
+        
+        axis.text.y = element_text(size= 15 ),
+        axis.text.x = element_text(size= 25,  angle=90 ),
+        #axis.text.x = element_blank(),
+        axis.title.x = element_text(size=20),
+        
+        axis.title.y     = element_text(size=20), 
+        legend.text      =element_text(size=12)
+  ) + coord_cartesian(ylim=c(min,max))
+
+
+
+global_var = ggplot(dfh2, aes(x=chr, y=cov, group=group)) +
+  geom_line( )+
+  geom_point(aes(shape=group), size=3, stroke=1)+ scale_shape_manual(values = c(2, 19, 4))  +
+   theme_minimal()   + xlab("") + ylab ( "median beta/chr ") +
+  theme(legend.position="right",  legend.key = element_blank(),
+          
+          axis.text.y = element_text(size= 25 ),
+          axis.text.x = element_text(size= 25, angle=90 ),
+          #axis.title.x = element_text(size=20),
+          
+          axis.title.y     = element_text(size=20), 
+          legend.text      =element_text(size=12)
+    ) +
+      theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          panel.background = element_blank(), axis.line = element_line(colour = "black"))   + coord_cartesian(ylim=c(min,max))
+
+
+
+```
+
+```{r}
+
+freq_class = data.frame ( table ( result$uhrf1$post$d.filter$class ) )
+freq_class2 = data.frame ( table ( result$kras$post$d.filter$class ) )
+
+freq_class$group = "siUHRF1"
+freq_class2$group = "siKRAS"
+
+freq_class = rbind ( freq_class, freq_class2)
+colnames ( freq_class)[1] = "class"
+
+
+
+
+cd =  data.frame ( dcast( freq_class
+                          , class   ~ group, value.var= "Freq"  ) )
+
+row.names ( cd ) = cd$class
+cd$class = NULL 
+
+chi = chisq.test(cd, simulate.p.value = T)
+
+
+
+
+
+dm_class = ggplot(freq_class, aes(fill=class, y=Freq, x=group)) + 
+    geom_bar(position="fill", stat="identity") +  # color=""
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  ylab("") + 
+  xlab("") + 
+  # scale_color_manual(values= rep("black", 13) ) +
+  scale_fill_manual(values=c(up="#c2684f",down="#6fab57") ) + ggtitle ( "DM direction") +
+  theme(legend.position="right",  legend.key = element_blank(),
+          
+          axis.text.y = element_text(size= 25 ),
+          axis.text.x = element_text(size= 25, angle=0 ),
+          #axis.title.x = element_text(size=20),
+          
+          axis.title.y     = element_text(size=20), 
+          legend.text      =element_text(size=12)
+    ) +  ggtitle ( paste0 ( "chisq: ", round ( chi$p.value, 4) ) )
+
+
+
+```
+
+
+```{r}
+
+# add ERV here 
+# first get from ucsc repeat masker and coordinates. Download this from table browser 
+
+
+erv_ele = read.table ( "./input/ERV_repeat.tsv" , sep="\t", header=T,stringsAsFactors = FALSE,
+                        na.strings=".", quote = "", fill = TRUE, skip=1, comment.char = "")
+
+erv_ele = erv_ele[ , c("genoName", "genoStart", "genoEnd", "strand")]
+colnames ( erv_ele ) = c( "chr", "start", "end","strand")
+# remove weird chromosomes 
+erv_ele = erv_ele[ ! grepl ( "_", erv_ele$chr ), ]
+unique ( erv_ele$chr)
+nrow ( erv_ele )
+
+erv_ele = makeGRangesFromDataFrame(erv_ele,
+                         keep.extra.columns=FALSE,
+                         ignore.strand=TRUE,
+                         seqinfo=NULL,
+                         seqnames.field=c("chr"),
+                         start.field="start",
+                         end.field=c("end"),
+                         strand.field="strand",
+                         starts.in.df.are.0based=FALSE
+                         )
+
+# get EPIC annotations 
+ann850k_erv = ann850k [   , c ( "chr", "pos", "strand", "Name") ] 
+ann850k_erv = data.frame(ann850k_erv@listData )
+
+
+# strand don't matter since we are are getting 50 bp up and down symtrically 
+# we keep the range small -1 * + 1+ 
+ann850k_erv$start = ann850k_erv$pos - 1
+ann850k_erv$end = ann850k_erv$pos + 1
+colnames ( ann850k_erv )[ which ( colnames ( ann850k_erv) == "Name")] = "cpg_probe"
+ann850k_erv$pos = NULL 
+
+
+ann850k_erv = makeGRangesFromDataFrame( ann850k_erv[ , c("chr", "start","end","cpg_probe")],
+                         keep.extra.columns=TRUE,
+                         #ignore.strand=TRUE,
+                         seqinfo=NULL,
+                         seqnames.field=c("chr"),
+                         start.field="start",
+                         end.field=c("end"),
+                         strand.field="strand",
+                         starts.in.df.are.0based=FALSE
+                         )
+
+# find all probes that that sits within the ERV site 
+
+type2 = findOverlaps(query = ann850k_erv, subject = erv_ele, type = 'within')
+
+
+type2.df = data.frame(ann850k_erv[queryHits(type2),], erv_ele[subjectHits(type2),])
+
+head ( type2.df)
+
+# type2.df and erv_probes now contains all ERV elements. 
+erv_probes = unique ( as.character ( type2.df$cpg_probe ) )
+
+# calculate stack plot here with chi square. We want to see if there is a global methylation decrease in 
+# siUHRF1 treatment 
+
+
+# we don't use filter because filter has removed duplicated genes; here we want to work exclusivel with coordinates
+
+freq_erv = data.frame ( table ( 
+  result$uhrf1$post$data[result$uhrf1$post$data$Name %in%  erv_probes,  ]$class ) 
+  
+  )
+
+
+freq_erv2 = data.frame ( table ( result$kras$post$data[result$kras$post$data$Name %in%  erv_probes,  ] $class 
+) )
+
+
+freq_erv = freq_erv[freq_erv$Var1 != "no-change", ]
+freq_erv2 = freq_erv2[freq_erv2$Var1 != "no-change", ]
+
+freq_erv$group = "siUHRF1"
+freq_erv2$group = "siKRAS"
+
+freq_erv = rbind ( freq_erv, freq_erv2)
+colnames ( freq_erv)[1] = "class"
+
+
+
+
+cd =  data.frame ( dcast( freq_erv
+                          , class   ~ group, value.var= "Freq"  ) )
+
+row.names ( cd ) = cd$class
+cd$class = NULL 
+
+set.seed(123)
+chi = chisq.test(cd, simulate.p.value = T)
+
+
+
+erv_feq_plot = ggplot(freq_erv, aes(fill=class, y=Freq, x=group)) + 
+  geom_bar(position="fill", stat="identity") +  # color=""
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  ylab("") + 
+  xlab("") + 
+  # scale_color_manual(values= rep("black", 13) ) +
+  scale_fill_manual(values=c(up="#c2684f",down="#6fab57") ) + ggtitle ( "DM direction") +
+  theme(legend.position="right",  legend.key = element_blank(),
+        
+        axis.text.y = element_text(size= 25 ),
+        axis.text.x = element_text(size= 25, angle=0 ),
+        #axis.title.x = element_text(size=20),
+        
+        axis.title.y     = element_text(size=20), 
+        legend.text      =element_text(size=12)
+  ) +  ggtitle ( paste0 ( "chisq: ", round ( chi$p.value, 4) ) )
+
+
+
+
+```
+
+### Global trends {.tabset}
+
+#### Bar ( median by chr )
+
+```{r fig=TRUE,fig.width=12, fig.height=9, echo=FALSE, include=TRUE, results='asis'}
+bar_global_cpg
+```
+
+#### Line ( median by chr )
+
+```{r fig=TRUE,fig.width=12, fig.height=9, echo=FALSE, include=TRUE, results='asis'}
+global_var
+```
+
+#### DM trends
+* here we look at the ratio of up or down for significant DM
+* a 50:50 implies no direction bias 
+
+```{r fig=TRUE,fig.width=6, fig.height=7.5, echo=FALSE, include=TRUE, results='asis'}
+dm_class
+
+pdf(paste0(paper_fig, "/global_stack_plot.pdf"), width=6, height=7)
+dm_class
+dev.off()
+
+
+
+```
+
+#### DM trends for ERV
+  * Do probes on ERV elements show similar trend? 
+   + Method: ERV coordinates donwloaded from UCSC repeatMasker. Only Family of ERV elements were included, LINE1, SINE were excluded. 
+   + Each position of a Cpg probe ( from EPIC plateform) were added and subtracted by 1 bp  
+   + These probes were chosen if the geneomic position +1 & -1 fall within the range of the ERV element.  
+   + however it is important to note that even if these result show that ERV may be invovled it IS NOT exclusive ERV regions and that its most likely a global event.  
+
+```{r fig=TRUE,fig.width=6, fig.height=7.5, echo=FALSE, include=TRUE, results='asis'}
+
+erv_feq_plot
+
+
+```
+
+
+
+```{r fig=TRUE,fig.width=12, fig.height=11, echo=FALSE, include=TRUE, results='asis' }
+
+for (nm in names( result ) ){
+  
+  
+  
+  cat("#### Top probes/genes", nm ,  "\n * Top most variable: note there may be repeated cpg  \n\n " )
+  print ( result[[nm]]$post$varplot  )
+  cat('\n\n')
+  
+  cat("#### Top 50 ", nm ,  "\n * Top most significant, ratio of relative CV \n\n " )
+  print ( result[[nm]]$post$top50_bar  )
+  cat('\n\n')
+  
+  cat("#### By chromosome ", nm ,  "\n * All significant, ratio of up or down, by chromsome \n\n " )
+  print ( result[[nm]]$post$sig_chr  )
+  cat('\n\n')
+  
+  cat('\n\n')
+  
+  
+}
+
+
+
+```
+
+
+```{r}
+
+fitvar.contr <- varFit( mvc , design=design, coef=c(1,2,3))
+#contr <- makeContrasts(CM=M-C, levels=design)
+fitvar.contr <- contrasts.varFit(fitvar.contr,contrasts=contMatrix )
+
+###### get stats 
+
+var_siUHRF1 <- topVar(fitvar.contr, coef="siUHRF1", num=nrow ( mv)  )
+head ( var_siUHRF1)
+hist ( var_siUHRF1$LogVarRatio)
+
+var_siKRAS <- topVar(fitvar.contr, coef="siKRAS", num=nrow ( mv)  )
+head ( var_siKRAS)
+hist ( var_siKRAS$LogVarRatio)
+
+
+dim ( var_siUHRF1 [ var_siUHRF1$Adj.P.Value < .05 & var_siUHRF1$P.Value < .05  , ])
+dim ( var_siKRAS [ var_siKRAS$Adj.P.Value < .05 & var_siKRAS$P.Value < .05  , ])
+
+
+### get gene results ############################################################
+var_siUHRF1 = merge ( ann850kSub, var_siUHRF1, by="row.names")
+colnames( var_siUHRF1   )[1] <- "gene"
+
+var_siKRAS = merge ( ann850kSub, var_siKRAS, by="row.names")
+colnames( var_siKRAS   )[1] <- "gene"
+
+### Merge #######################################################################
+
+
+var_siUHRF1 <- merge( data.frame ( var_siUHRF1) , bvc [ , key_uhrf1$sample ] 
+                      , by.y="row.names", by.x="gene" )
+colnames( var_siUHRF1   )[1] <- "gene"
+
+var_siKRAS <- merge( data.frame ( var_siKRAS ) , bvc [ , key_kras$sample ] 
+                     , by.y="row.names", by.x="gene" )
+colnames( var_siKRAS   )[1] <- "gene"
+
+
+dim ( var_siUHRF1[var_siUHRF1$P.Value< .05 & var_siUHRF1$Adj.P.Value < .05,])
+dim ( var_siKRAS[var_siKRAS$P.Value< .05 & var_siKRAS$Adj.P.Value < .05,])
+
+# rname to make it look like limma 
+# "P.Value"
+# "adj.P.Val"
+# "logFC"
+cn = colnames( var_siUHRF1   )
+cn = gsub ( "Adj.P.Value", "adj.P.Val", cn )
+cn = gsub ( "LogVarRatio", "logFC", cn )
+colnames ( var_siUHRF1) = cn
+
+
+
+cn = colnames( var_siKRAS   )
+cn = gsub ( "Adj.P.Value", "adj.P.Val", cn )
+cn = gsub ( "LogVarRatio", "logFC", cn )
+colnames ( var_siKRAS) = cn 
+rsub <- colnames(var_siUHRF1 )[1:which ( colnames ( var_siUHRF1) == "adj.P.Val")]
+
+
+
+result_var = list ()
+
+result_var$uhrf1$result = var_siUHRF1
+result_var$uhrf1$fdr = .05 
+result_var$uhrf1$pv = .05
+result_var$uhrf1$logfc = 0
+result_var$uhrf1$key = key_uhrf1
+result_var$uhrf1$exp = c ( exp="siUHRF1", control="siNeg" )
+result_var$uhrf1$title = " siUHRF1_vs_siNeg"
+
+result_var$kras$result = var_siKRAS
+result_var$kras$fdr = .05
+result_var$kras$pv =  .05
+result_var$kras$logfc = 0
+result_var$kras$key = key_kras
+result_var$kras$exp = c ( exp="siKRAS", control="siNeg" )
+result_var$kras$title = " siKRAS_vs_siNeg"
+
+
+
+for ( res in names ( result_var)   ){
+  
+result_var[[res]]$post = plot.post ( result.gene=result_var[[res]]$result, g1="Group", g2="Group" 
+                             , new.key=result_var[[res]]$key, r.sub=rsub, exp.group='Group'
+                             , exp.this=as.character ( result_var[[res]]$exp['exp'] )
+                             , normal.this= as.character ( result_var[[res]]$exp['control'] )
+                             , sample.id="sample"
+                             , GENE_SYMBOL = "gene"
+                             , fdr=result_var[[res]]$fdr
+                            , p.val = result_var[[res]]$pv
+                             , fold_thres = result_var[[res]]$logfc
+                            , title1 = result_var[[res]]$title
+                            #, top10 = top10
+                            , normal.color = "#d442f5"
+                           , exp.color = "#ebeced"
+                           ,samp_dist = "euclidean"
+                           ,gene_dist = "spearman"
+                           ,samp_clust = "ward.D"
+                           ,heat.title = "BV "
+                           ,heat.color = colorRampPalette(c( "#0f6af2","yellow","red"))(1024) # colorRampPalette(rev(brewer.pal(n = 7, name ="RdYlBu")))(100)
+                           ,rsplit = 2
+                           ,csplit =2
+                           ,pcalabel = 0
+                           ,cname = FALSE
+                           #, human = ens
+                       , gene.name = "external_gene_name"
+                       , gene.id = "entrezgene_id"
+                       #, km = km
+                       #, elevel = elevel
+                       
+                            )
+
+
+result_var[[res]]$post$pca.unc
+
+
+
+#### cleanup and get gene name 
+
+
+result_var[[res]]$post$d.filter = result_var[[res]]$post$data [ result_var[[res]]$post$data$GencodeBasicV12_NAME != "" & result_var[[res]]$post$data$class != "no-change", ]
+colnames ( result_var[[res]]$post $d.filter )[1] = "CpgProbe"
+
+
+
+# split into different rows for each gene. This will create probe duplicates! 
+result_var[[res]]$post$d.filter  = result_var[[res]]$post$d.filter %>% dplyr::group_by(CpgProbe) %>% 
+  mutate(gene = paste ( unique ( unlist ( strsplit(as.character(GencodeBasicV12_NAME), ";")) ), collapse = ";")  )%>% # string split to unique  first
+  mutate(gene = strsplit(as.character(gene), ";")  )   %>% # keep list afters string split to unnest into new rows. 
+  unnest(gene)     %>% data.frame(stringsAsFactors = F)
+
+# reorganize to make pretty 
+cname = colnames (result_var[[res]]$post$d.filter )
+stat1 = which ( cname == "SampleVar" )
+stat2 = which ( cname == "adj.P.Val")
+statn = cname[stat1:stat2]
+aven = cname [ grepl (".ave", cname)]
+
+
+result_var[[res]]$post$d.filter  = result_var[[res]]$post$d.filter [ , unique ( c ( "gene", "CpgProbe", "class", aven, statn, cname ))]
+
+result_var[[res]]$post$allcpg = unique ( result_var[[res]]$post$d.filter$CpgProbe )
+
+
+# remove conflicting genes that are both up and down. 
+
+
+conflict = result_var[[res]]$post$d.filter %>%
+  group_by(gene) %>% 
+  filter(n_distinct(class) != 1) %>%
+  ungroup %>% data.frame(stringsAsFactors = F)
+
+result_var[[res]]$post$d.filter = result_var[[res]]$post$d.filter %>%
+  group_by(gene) %>% 
+  filter(n_distinct(class) == 1) %>%
+  ungroup %>% data.frame(stringsAsFactors = F)
+
+# count how many times occurance set that to cpgN 
+
+result_var[[res]]$post$d.filter  = result_var[[res]]$post$d.filter %>% dplyr::group_by(gene) %>% 
+  mutate(cpg_total = n()  )%>%data.frame(stringsAsFactors = F)
+
+result_var[[res]]$post$d.filter  = result_var[[res]]$post$d.filter [ , unique ( c ( "gene", "CpgProbe", "class","cpg_total", aven, statn, cname ))]
+
+# remove duplicates but keep the highest absolute version 
+result_var[[res]]$post$allcpg = result_var[[res]]$post$d.filter$CpgProbe
+
+temp = result_var[[res]]$post$d.filter [ order ( abs(result_var[[res]]$post$d.filter$logFC), decreasing = T), ]
+temp = temp [!duplicated ( temp$gene), ]
+#View ( temp [ temp$cpg_total > 1, ])
+result_var[[res]]$post$d.filter = temp 
+
+
+########################
+
+
+
+
+cpg.pval2 =   result_var[[res]]$result$P.Value
+names ( cpg.pval2 ) = result_var[[res]]$result$gene
+
+
+
+
+go2= methylRRA (cpg.pval = cpg.pval2, method = "GSEA", 
+                    minsize = 50, maxsize = 500, GS.type= c( "GO") , array.type = "EPIC"  )
+
+kegg2 = methylRRA(cpg.pval = cpg.pval2, method = "GSEA", 
+                    minsize = 50, maxsize = 500, GS.type= c( "KEGG") , array.type = "EPIC" )
+reactome2 = methylRRA(cpg.pval = cpg.pval2, method = "GSEA", 
+                    minsize = 50, maxsize = 500, GS.type= c( "Reactome") , array.type = "EPIC" )
+
+#hall2 = methylRRA(cpg.pval = cpg.pval2, method = "GSEA", 
+ #                   minsize = 50, maxsize = 500, GS.type= c( "Hallmark") , array.type = "EPIC" )
+
+
+
+result_var[[res]]$post$gsea$go = plot.gsea_meth (go2[ go2$pvalue < .05 & go2$padj < .05, ], thres = 10 ) 
+result_var[[res]]$post$gsea$kegg = plot.gsea_meth ( kegg2 [ kegg2$pvalue < .05 & kegg2$padj < .05, ], thres = 10 )
+result_var[[res]]$post$gsea$reactome = plot.gsea_meth (reactome2[ reactome2$pvalue < .05 & reactome2$padj < .05, ], thres=10)
+
+# result_var[[res]]$post$gsea$tables = list (go2=go2, kegg2=kegg2, reactome2=reactome2) 
+
+
+## hyper geometric 
+
+all_gene = unique ( result_var[[res]]$post$data$GencodeBasicV12_NAM )
+all_gene = all_gene[all_gene!=""]
+all_gene = sort ( unique ( unlist ( strsplit(as.character(all_gene), ";")) ) )
+
+result_var[[res]]$post$hyper = get.enrich4 (
+  g =  result_var[[res]]$post$d.filter
+  ,refdb = ens
+  ,g.name="gene"
+  , m.name="external_gene_name"
+  ,e.name="entrezgene_id"
+  , logFC= "logFC"
+  ,species="Hs"
+  ,bg = all_gene
+  ,fdr=.05
+  ,goana_db=goanadb
+  , total_annt = 0  # how many rows to return with genes responsible for the enrichment
+  
+) 
+
+
+set.seed(123)
+
+tsne_out2 <- Rtsne( t(bvc[result_var[[res]]$post$allcpg  , result_var[[res]]$key$sample])  ,  perplexity = 1 ) # Run TSNE
+
+df1 <- data.frame(x = tsne_out2$Y[,1],
+                  y = tsne_out2$Y[,2],
+                  group =result_var[[res]]$key$Group
+                  
+)
+
+result_var[[res]]$post$tsne =  ggplot(df1, aes(x, y, shape = group )) +
+  geom_point(size=12, alpha=.8, stroke=3) +
+  theme_minimal()   + xlab("tSNE 1") + ylab ( "tSNE 2 ") +
+  theme(legend.position="bottom",  legend.key = element_blank(),
+        
+        axis.text.y = element_text(size= 15 ),
+        #axis.text.x = element_blank(),
+        axis.title.x = element_text(size=20),
+        
+        axis.title.y     = element_text(size=20), 
+        legend.text      =element_text(size=12)
+  ) + scale_shape_manual(values = c(2, 19))
+
+
+
+########################## 
+
+
+## plot top variability 
+
+
+
+
+df = bvc [  result_var[[res]]$post$d.filter$CpgProbe[1:10]  ,result_var[[res]]$key$sample  ]
+df = melt ( as.matrix ( df ) )
+colnames ( df ) = c("CpgProbe", "sample", "value")
+
+
+df = merge ( df, result_var[[res]]$post$d.filter [ , c("CpgProbe", "gene") ], by="CpgProbe" )
+df$sample = as.character ( df$sample)
+df = merge ( df, result_var[[res]]$key[ , c("sample", "Group")], by="sample")
+df$gene = paste ( df$CpgProbe, df$gene)
+
+result_var[[res]]$post$varplot = ggplot( df, aes(y=value, x=Group)) +
+  geom_violin()+ 
+  geom_jitter(shape=19, position=position_jitter(0.07), aes( colour=Group), size=1 ) +
+  theme_bw() +
+  ylab(" ") +
+  xlab("") +
+  theme(legend.position="none", legend.title=element_blank(), legend.key = element_blank(),
+        
+        axis.text.y = element_text(size=12),
+        axis.text.x = element_text(angle = 90, size=11.5),
+        axis.title.x = element_text(size=22),
+        
+        axis.title.y     = element_text(size=22), 
+        legend.text      =element_text(size=12)
+  ) + stat_summary(fun.y = mean, fun.ymin = mean, fun.ymax = mean,
+                   geom = "crossbar", width = .5) + scale_colour_manual(values=ccc) +
+  facet_wrap(~gene, ncol = 3 , scales = "free"  ) 
+
+
+
+# plot variability top 50 
+
+
+cpgplot = result_var[[res]]$post$data [ result_var[[res]]$post$data$class != "no-change", ]$gene
+dfc = bvc [  cpgplot[1:50] ,result_var[[res]]$key[result_var[[res]]$key$Group == result_var[[res]]$exp["control"], ]$sample  ]
+dfm = bvc [  cpgplot[1:50]  ,result_var[[res]]$key[result_var[[res]]$key$Group == result_var[[res]]$exp["exp"], ]$sample  ]
+
+dfc = apply ( dfc, 1, function (x) cov(x))
+dfc = data.frame ( cpg=names ( dfc), cv=as.numeric ( dfc ))
+dfc$group = result_var[[res]]$exp["control"]
+dfm = apply ( dfm, 1, function (x)  cov (x))
+dfm = data.frame ( cpg=names ( dfm), cv=as.numeric ( dfm ))
+dfm$group = result_var[[res]]$exp["exp"]
+
+dfh = rbind ( dfm, dfc)
+
+dfh = reshape(dfh, idvar = "group", timevar = "cpg", direction = "wide")
+row.names ( dfh ) = dfh$group
+dfh$group = NULL
+cm2 = scale ( data.matrix(dfh) ) 
+cm2 = apply ( data.matrix(dfh), 2, scale)
+
+ 
+ 
+ 
+dfh = rbind ( dfm, dfc)
+dfh = dfh [ order ( dfh$cv, decreasing = T), ]
+dfh$cpg = factor ( dfh$cpg, levels= unique ( dfh$cpg))
+
+dfh$lcpg = log2 ( dfh$cv)
+result_var[[res]]$post$top50_line <-ggplot(dfh, aes(x=cpg, y=cv, group=group)) +
+  geom_line( )+
+  geom_point(aes(shape=group), size=1, stroke=1)+ scale_shape_manual(values = c(2, 19))  +
+   theme_minimal()   + xlab("") + ylab ( "relative standard deviation (CV)") +
+  theme(legend.position="right",  legend.key = element_blank(),
+          
+          axis.text.y = element_text(size= 15 ),
+          axis.text.x = element_blank(),
+          #axis.title.x = element_text(size=20),
+          
+          axis.title.y     = element_text(size=20), 
+          legend.text      =element_text(size=12)
+    ) +
+      theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          panel.background = element_blank(), axis.line = element_line(colour = "black")) 
+
+
+dfh$group = factor (dfh$group, levels=  c ( as.character ( result_var[[res]]$exp[ "control"] ) ,  as.character ( result_var[[res]]$exp[ "exp"] )) )
+
+
+
+result_var[[res]]$post$top50_bar = ggplot(dfh, aes(x=cpg, y=cv, fill=group)) +
+  geom_bar(position="stack", stat="identity") +
+  theme_minimal()   + xlab("") + ylab ( "relative standard deviation (CV)") +
+  theme(legend.position="right",  legend.key = element_blank(),
+        
+        axis.text.y = element_text(size= 25 ),
+        #axis.text.x = element_text(size= 25 , angle=90),
+        axis.text.x = element_blank(),
+        axis.title.x = element_text(size=25),
+        
+        axis.title.y     = element_text(size=20), 
+        legend.text      =element_text(size=12)
+  ) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black")) +scale_fill_manual(values=ccc) + ggtitle ( "top 50 significant")
+
+
+
+
+
+### how many up and how many down? 
+### 
+
+freqvar2 = data.frame ( table ( result_var[[res]]$post$d.filter[result_var[[res]]$post$d.filter$class == "up", ]$chr) )
+colnames ( freqvar2 ) = c( "Chr", "Freq")
+freqvar2 = freqvar2 [ order ( freqvar2$Freq, decreasing = T), ]
+freqvar2$class = "up"
+
+
+freqvar = data.frame ( table ( result_var[[res]]$post$d.filter[result_var[[res]]$post$d.filter$class == "down", ]$chr) )
+colnames ( freqvar ) = c( "Chr", "Freq")
+freqvar = freqvar [ order ( freqvar$Freq, decreasing = T), ]
+freqvar$class = "down"
+
+freqvar = rbind ( freqvar, freqvar2)
+
+
+freqvar$Chr = factor ( freqvar$Chr, levels=c(paste0 ( "chr",seq ( 1, 22) ), "chrX", "chrY")  )
+
+
+
+result_var[[res]]$post$sig_chr = ggplot(freqvar, aes(Chr, Freq, fill=class)) +   
+ geom_bar(position="stack", stat="identity") +
+   theme_minimal()   + xlab("") + ylab ( "Freqeuncy") +
+  theme(legend.position="right",  legend.key = element_blank(),
+          
+          axis.text.y = element_text(size= 25 ),
+        axis.text.x = element_text(size= 25 , angle=90),
+          #axis.text.x = element_blank(),
+          axis.title.x = element_text(size=25),
+          
+          axis.title.y     = element_text(size=20), 
+          legend.text      =element_text(size=12)
+    ) +
+      theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          panel.background = element_blank(), axis.line = element_line(colour = "black")) +scale_fill_manual(values=c(up="#c2684f",down="#6fab57") ) + ggtitle ( "ratio by chromosome")
+
+
+
+}
+
+
+```
+
+
+
+```{r}
+# looking for pathways related to development/morphonesis/stem cells 
+# also outputing to cytoscape for visual and kappa stats to aggregate pathways. 
+
+rev1 = result[['uhrf1']]$post$gsea[[ 'go'  ]]$df
+rev1 = rev1 [ grepl ( "development|morphog|stem cell|progenitor|differentiation", rev1$Description), ]
+head ( rev1[ , c("ID","Description", "NES","pvalue","padj") ])
+
+write.table(rev1[ , c("ID","padj") ]
+,paste0( "./out/forcytoscape_gsea_development.txt"), row.names=F, col.names=T, append = FALSE, sep = "\t",quote=FALSE)
+
+
+# write everything. 
+allgsea = rbind ( result[['uhrf1']]$post$gsea[[ 'go'  ]]$df, result[['uhrf1']]$post$gsea[[ 'reactome'  ]]$df )
+allgsea = rbind ( allgsea, result[['uhrf1']]$post$gsea[[ 'kegg'  ]]$df  )
+write.table(allgsea[ , c("ID","padj") ]
+,paste0( "./out/all_gsea.txt"), row.names=F, col.names=T, append = FALSE, sep = "\t",quote=FALSE)
+
+
+wbgsea <- createWorkbook()
+
+addWorksheet(wbgsea, 'gsea')
+writeData(wbgsea, 'gsea' , allgsea  , rowNames=F  )
+
+saveWorkbook(wbgsea, file = paste0(final_fig,"GSEA.xlsx"), overwrite = TRUE)
+
+
+
+# import this into cluego to calculate kappa scores and group this is the result 
+
+cluego1 = read.xlsx("https://www.dropbox.com/s/y1k52a7ailqydxu/gsea_uhrf1_development_stemcell_table.xlsx?dl=1")
+cluegototal = nrow ( cluego1 )
+
+cluego1b = data.frame()
+
+for ( c in unique ( cluego1$GOGroups) ){
+  group = c 
+  c = cluego1[ cluego1$GOGroups == c, ] 
+  topc = rev1[ rev1$ID %in% c$GOID, ] 
+  topc = topc [ order ( topc$padj , -topc$NES), ]
+  topc$core_enrichment = NULL 
+  cper = round ( nrow ( c ) / cluegototal, 2) * 100
+  cluego1b = rbind ( cluego1b 
+                     , data.frame(group=topc$Description[1],total=nrow(c), percent=cper , oldgroup=group)
+                     )
+}
+
+cluego1b = cluego1b[ order ( -cluego1b$total), ]
+cluego1b = cluego1b[cluego1b$group != "No Group", ]
+cluego1b = cluego1b[ cluego1b$total > 5, ]
+#cluego1b$group = ifelse ( cluego1b$oldgroup=="None", "No Group", cluego1b$group) 
+cluego1b$group = factor ( cluego1b$group, levels = as.character ( rev ( cluego1b$group) ) )
+
+
+gseaGo_devel_plot= ggplot(cluego1b , aes( x = group, total )) + 
+  geom_col( fill="steelblue" ) + 
+  #geom_col( aes ( fill= NES ) ) + 
+  coord_flip() +
+  theme(legend.position="right",  legend.key = element_blank(),
+        # element_blank()
+        axis.text.y = element_text(size= 18 ),
+        axis.text.x =  element_text(size= 18 ),
+        axis.title.x = element_text(size=18),
+        axis.title.y     = element_text(size=18), 
+        legend.text      =element_text(size=18),
+        legend.title = element_text(size=18),
+        plot.title = element_text(size = 40, face = "bold", hjust = 0.5)
+        # hjust centers the title
+  ) + theme(panel.grid.major = element_blank()
+            , panel.grid.minor = element_blank()
+            ,panel.background = element_blank()
+            , axis.line = element_line(colour = "black") # plot border
+  ) + scale_fill_gradient2(low = "#c5dce6", 
+                       high = "#308bb3", 
+                       mid = "#00b1ff",
+                       midpoint = median(cluegoALLb$NES)
+  ) +scale_y_log10(breaks = scales::log_breaks(n = 10 , base=2)) +
+  # scale_x_discrete(labels = wrap_format(60)) # wrap
+   scale_x_discrete(label = function(x) stringr::str_trunc(x, 60))
+ 
+
+
+
+
+```
+
+### Extra Pathways {.tabset}
+
+  * Reviewer was wondering why pathways did not show certain polycomb group proteins (PCG)related pathways such as, ones for development, morphogenesis or stem cell/progenitor and differentiation. This is because we did not show most pathways. Here I subsetted GO pathways in our GSEA analysis and found `r nrow ( rev1)` invovled in these pathways.  
+
+#### plot PCG
+  * In the original paper many of the pathways were not shown, leading the reviewer to wonder why certain pathways especially those of (PCG)related pathways such as, ones for development, morphogenesis or stem cell/progenitor and differentiation were not present. Thus here I took all significant GSEA enriched pathways related to aforementioned pathways, calculated KAPA score ( group ) and label the top group with the pathway with lowest pv and highest enrichment score.
+  * we extracted relevant pathways and group pathways using cluego 
+  * only groups with >5 pathways are shown
+  * each group is described by the pathway with the lowest fdr follow by highest enrichment score. 
+  * x-axis is the total pathways asociated with each group ( y-axis)
+
+```{r fig=TRUE,fig.width=12, fig.height=7, echo=FALSE, include=TRUE, results='asis' }
+gseaGo_devel_plot
+```
+
+#### Table 
+
+```{r fig=TRUE,fig.width=20, fig.height=9, echo=FALSE, include=TRUE, results='asis' }
+DT::datatable(rev1[ , c("ID","Description", "NES","pvalue","padj") ], 
+              filter= list ( position="top", clear = FALSE )  
+                                , extensions = 'Buttons'
+                                      , options = list(dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel', 'pdf', 'print')
+                                                 , autoWidth = F
+                                                 , scrollX=T, className = 'dt-left'
+                                                 , pageLength = 10
+                                                 ) 
+              )
+```
+  
+
+```{r}
+# do total now 
+cluegoALL = read.xlsx("https://www.dropbox.com/s/fhw99owu251wjyn/gsea_all_cytoscape.xlsx?dl=1")
+cluegototal = nrow ( cluegoALL )
+
+cluegoALLb = data.frame()
+
+for ( c in unique ( cluegoALL$GOGroups) ){
+  group = c 
+  c = cluegoALL[ cluegoALL$GOGroups == c, ] 
+  topc = allgsea[ allgsea$ID %in% c$GOID, ] 
+  topc = topc [ order ( topc$padj , -topc$NES), ]
+  topc$core_enrichment = NULL 
+  cper = round ( nrow ( c ) / cluegototal, 2) * 100
+  cluegoALLb = rbind ( cluegoALLb 
+                     , data.frame(group=topc$Description[1],total=nrow(c), percent=cper , oldgroup=group
+                                  , NES=topc$NES[1], pv=topc$padj[1]
+                                  )
+  )
+}
+
+cluegoALLb = cluegoALLb[ order ( -cluegoALLb$total), ]
+
+
+cluegoALLb = cluegoALLb[cluegoALLb$group != "No Group", ]
+cluegoALLb = cluegoALLb[ cluegoALLb$total > 5, ]
+
+
+#cluegoALLb$group = ifelse ( cluegoALLb$oldgroup=="None", "No Group", cluegoALLb$group) 
+cluegoALLb$group = factor ( cluegoALLb$group, levels = as.character ( rev ( cluegoALLb$group) ) )
+
+
+gseaGo_all_plot= ggplot(cluegoALLb , aes( x = group, y=total )) + 
+  geom_col( aes ( fill= NES ) ) + 
+  coord_flip() +
+  theme(legend.position="right",  legend.key = element_blank(),
+        # element_blank()
+        axis.text.y = element_text(size= 18 ),
+        axis.text.x =  element_text(size= 18 ),
+        axis.title.x = element_text(size=18),
+        axis.title.y     = element_text(size=18), 
+        legend.text      =element_text(size=18),
+        legend.title = element_text(size=18),
+        plot.title = element_text(size = 40, face = "bold", hjust = 0.5)
+        # hjust centers the title
+  ) + theme(panel.grid.major = element_blank()
+            , panel.grid.minor = element_blank()
+            ,panel.background = element_blank()
+            , axis.line = element_line(colour = "black") # plot border
+  ) + scale_fill_gradient2(low = "#c5dce6", 
+                       high = "#308bb3", 
+                       mid = "#00b1ff",
+                       midpoint = median(cluegoALLb$NES)
+  ) +scale_y_log10(breaks = scales::log_breaks(n = 10 , base=2)) +
+  # scale_x_discrete(labels = wrap_format(60)) # wrap
+   scale_x_discrete(label = function(x) stringr::str_trunc(x, 50))
+
+```
+
+#### plot PCG
+
+  * Here we plot __all enriched__ GSEA pathways, this includes kegg, go, and reactome
+  * Aggregated. 
+  * only groups with >5 pathways are shown
+  * each group is described by the pathway with the lowest fdr follow by highest enrichment score.
+  * total is represented as log2 ( total pathways for the particular group)
+
+```{r fig=TRUE,fig.width=20, fig.height=10.5, echo=FALSE, include=TRUE, results='asis' }
+gseaGo_all_plot
+
+```
+
+```{r}
+
+
+
+pdf(paste0(final_fig, "/gseaPlot.pdf"), width=15.66, height=14)
+gseaGo_all_plot
+dev.off()
+
+```
+
+## CpG variablity {.tabset}
+
+
+```{r fig=TRUE,fig.width=12, fig.height=9, echo=FALSE, include=TRUE, results='asis' }
+library  ( patchwork)
+do.this = c (   "tsne"    , "volcano" , "scatter",  "ma"        )
+bubble_up2 = data.frame ()
+bubble_down2 = data.frame()
+
+for (nm in names( result_var ) ){
+  
+  
+
+  
+  
+  cat("### ", nm ,  " {.tabset} \n\n " )
+  
+  cat('\n\n')
+
+  
+  
+  cat("#### ", nm, "Stats", " \n * red lines define DEG cutoffs  \n\n " )
+  
+  print (  result_var[[nm]]$post$hist$p.value +  result_var[[nm]]$post$hist$logfc + result_var[[nm]]$post$hist$fdr  )
+  
+  cat('\n\n')
+  cat ( "\n")
+  
+  
+  cat("#### ", nm, "DEG Table", " \n * Showing only DEG genes. See Excel for full set \n\n " )
+  
+  print(htmltools::tagList(  DT::datatable( result_var[[nm]]$post$d.filter[ , c ( "gene", "CpgProbe", "class", statn) ] , rownames = F, filter= list ( position="top", clear = FALSE )  
+                                            , extensions = 'Buttons'
+                                            , options = list(dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel', 'pdf', 'print')
+                                                             , autoWidth = T
+                                                             , scrollX=T, className = 'dt-left') )  )  )
+  
+  cat('\n\n')
+  
+
+  
+  for ( p in c ( do.this)){
+    
+    cat("#### ", p, " \n")
+    print ( result_var[[nm]]$post[[p]]  )
+    cat('\n\n')
+    
+  }
+  
+  
+  cat('\n\n')
+  
+  
+  cat("#### ", "hm", " \n")
+  print ( result_var[[nm]]$post$mds  )
+  cat('\n\n')
+  
+  cat("#### ", "", " \n")
+  print ( result_var[[nm]]$post$hm  )
+  cat('\n\n')  
+  
+  
+  
+  
+  
+  cat("#### ", nm, "GSEA", " {.tabset} \n * We break it up by canonical and GO \n\n " )
+  
+  cat ("\n")
+  
+  for ( gg in   names ( result_var[[nm]]$post$gsea )  ) {
+    
+     
+    if ( nrow ( result_var[[nm]]$post$gsea[[gg]]$df) == 0 ){
+      next
+    }
+    
+    cat("##### ", gg, " \n")
+    print ( result_var[[nm]]$post$gsea[[gg]]$plot  )
+    cat('\n\n')
+    
+    # combine up and down for later bubble plots 
+    
+    result_var[[nm]]$post$gsea[[gg]]$df$group = result_var[[nm]]$title
+    bubble_up = rbind ( result_var[[nm]]$post$gsea[[gg]]$df )
+    
+
+    
+    cat("##### Genes ", gg, " \n")
+    print(htmltools::tagList(  DT::datatable(  result_var[[nm]]$post$gsea[[gg]]$df , rownames = F, filter= list ( position="top", clear = FALSE )  
+                                               , extensions = 'Buttons'
+                                               , options = list(dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel', 'pdf', 'print')
+                                                                , autoWidth = T
+                                                                , scrollX=T, className = 'dt-left') )  )) 
+    cat('\n\n')
+    
+  }
+  
+  
+  cat('\n\n')
+  
+  
+  
+  
+  cat("#### ", nm, "Over-representation Analysis", " {.tabset} \n\n\n" )
+  
+  cat ("\n")
+  
+  for ( gg in c ( names ( result_var[[nm]]$post$hyper$df)  )){
+    
+    cat("##### ", gg, " \n")
+    print ( result_var[[nm]]$post$hyper$plots[[gg]]$plot  )
+    cat('\n\n')
+    
+
+    
+  }
+  
+  
+  
+  cat('\n\n')
+  
+  
+  
+  
+}
+
+```
+
+
+### Trends {.tabset}
+
+#### Var trends {.tabset}
+
+  * here we look at the ratio of up or down for significant var probes
+  * a 50:50 implies no direction bias 
+
+
+```{r fig=TRUE,fig.width=6, fig.height=7.5, echo=FALSE, include=TRUE, results='asis' }
+
+var_class_global = data.frame ( table ( result_var$uhrf1$post$d.filter$class ) )
+var_class_global2 = data.frame ( table ( result_var$kras$post$d.filter$class ) )
+
+var_class_global$group = "siUHRF1"
+var_class_global2$group = "siKRAS"
+
+var_class_global = rbind ( var_class_global, var_class_global2)
+colnames ( var_class_global)[1] = "class"
+
+
+
+cd =  data.frame ( dcast( var_class_global
+, class   ~ group, value.var= "Freq"  ) )
+
+row.names ( cd ) = cd$class
+cd$class = NULL 
+
+chi = chisq.test(cd, simulate.p.value = T)
+
+
+dm_class_2 = ggplot(var_class_global, aes(fill=class, y=Freq, x=group)) + 
+  geom_bar(position="fill", stat="identity") +  # color=""
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  ylab("") + 
+  xlab("") + 
+  # scale_color_manual(values= rep("black", 13) ) +
+  scale_fill_manual(values=c(up="#c2684f",down="#6fab57") ) + ggtitle ( "variability direction") +
+  theme(legend.position="right",  legend.key = element_blank(),
+        
+        axis.text.y = element_text(size= 25 ),
+        axis.text.x = element_text(size= 25, angle=0 ),
+        #axis.title.x = element_text(size=20),
+        
+        axis.title.y     = element_text(size=20), 
+        legend.text      =element_text(size=12)
+  ) + ggtitle ( paste0 ( "chisq: ", round ( chi$p.value, 4) ) )
+
+dm_class_2
+
+
+
+```
+
+
+
+```{r fig=TRUE,fig.width=12, fig.height=9, echo=FALSE, include=TRUE, results='asis' }
+
+for (nm in names( result_var ) ){
+  
+  
+  
+   cat("#### Top probes/genes", nm ,  "\n * Top most variable: note there may be repeated cpg  \n\n " )
+  print ( result_var[[nm]]$post$varplot  )
+  cat('\n\n')
+  
+  cat("#### Top 50 ", nm ,  "\n * Top most significant, ratio of relative CV \n\n " )
+  print ( result_var[[nm]]$post$top50_bar  )
+  cat('\n\n')
+  
+  cat("#### By chromosome ", nm ,  "\n * All significant, ratio of up or down, by chromsome \n\n " )
+  print ( result_var[[nm]]$post$sig_chr  )
+  cat('\n\n')
+  
+  cat('\n\n')
+  
+  
+
+  
+}
+
+
+
+```
+
+```{r}
+
+ addWorksheet(wb, 'single_data_uhrf1')
+  writeData(wb, 'single_data_uhrf1' , result$uhrf1$result)
+
+ addWorksheet(wb, 'single_data_kras')
+  writeData(wb, 'single_data_kras' , result$kras$result)
+
+  
+ addWorksheet(wb, 'var_data_uhrf1')
+  writeData(wb, 'var_data_uhrf1' , result_var$uhrf1$result)
+
+ addWorksheet(wb, 'var_data_kras')
+  writeData(wb, 'var_data_kras' , result_var$kras$result)
+  
+  if ( savexls == 1 ){
+  saveWorkbook(wb, file = paste0(out.dir,"data.xlsx"), overwrite = TRUE)
+  }
+
+  # extract the bvc values 
+  bvc_save = bvc [ , c_key$sample]
+  colnames ( bvc_save) = paste0 ( c_key$tube, "_", c_key$siRNA, "_", c_key$Cells)  
+  bvc_save = merge (ann850kSub, bvc_save, by = "row.names"  )
+  colnames ( bvc_save)[1] = "cpg_probe"
+  
+  # split into different rows for each gene. This will create probe duplicates! 
+ fbvc  = data.frame ( bvc_save) %>% dplyr::group_by(cpg_probe) %>% 
+    mutate(gene = paste ( unique ( unlist ( strsplit(as.character(GencodeBasicV12_NAME), ";")) ), collapse = ";")  )%>% # string split to unique  first
+     mutate(gene = strsplit(as.character(gene), ";")  )   %>% # keep list afters string split to unnest into new rows. 
+    unnest(gene)     %>% data.frame(stringsAsFactors = F)
+ fbvc =  fbvc [ , unique ( c("gene", colnames ( fbvc)) )]
+ temp = fbvc[fbvc$gene %in% kaja$gene , ]
+
+ wb2 <- createWorkbook()
+  addWorksheet(wb2, 'beta_values')
+  writeData(wb2, 'beta_values' , temp  )
+  if ( savexls == 1 ){
+  saveWorkbook(wb2, file = paste0(out.dir,"beta_kajaList.xlsx"), overwrite = TRUE)
+  }
+```
+
+
+```{r}
+# correlations 
+
+ 
+
+### adding LUAD TSG here not in kaja list. This was requested by reviewers to add more traditional tsg from LUAD study 
+
+# download table: S_Table 5-Verification
+
+luad_paper = read.xlsx("https://www.dropbox.com/s/8jy8nvgu9o0wxkf/NIHMS629713-supplement-Supllementary_information_2.xlsx?dl=1"
+                       , sheet = "mod_table5"
+                       )
+
+luad_paper = luad_paper[ luad_paper$Validation.Judgement == 1, ]
+luad_paper = luad_paper[!duplicated ( luad_paper$Hugo.Symbol), ]
+total_luad1 = nrow ( luad_paper)
+
+# how many of these in kaja list 
+total_luad_inkaja = length ( intersect(luad_paper$Hugo.Symbol, kaja$gene ) )
+
+# subset by only TSG in cosmic
+luad_paper = luad_paper[ luad_paper$Hugo.Symbol %in% 
+                           unique ( cosmic[grepl ( "TSG", cosmic$Role.in.Cancer ), ]$Gene.Symbol )
+                         , ]
+total_luad2 = nrow ( luad_paper )
+
+# not in kaja list 
+notinkaja_luad = setdiff ( luad_paper$Hugo.Symbol, kaja$gene)
+
+# add to kaja list
+notinkaja_luad = cosmic[ cosmic$Gene.Symbol %in% notinkaja_luad, ]
+notinkaja_luad = notinkaja_luad[ , c("Entrez.GeneId", "Gene.Symbol" )]
+colnames ( notinkaja_luad) = c("gene.id", "gene")
+
+kaja = rbind ( kaja, notinkaja_luad)
+
+
+data = readRDS("/ehome/resource/public/gdac/GDAC.LUAD.rds" )
+t_index = data$t_index
+cpm = data$cpm
+both = intersect ( row.names ( cpm )  ,  kaja$gene )
+cpm = cpm [ row.names ( cpm ) %in% unique ( c ( "UHRF1", both) ), ]
+cpm = data.frame ( t ( cpm ), stringsAsFactors = F )
+cpm = cpm [ , unique ( c ( "UHRF1", gsub ( "-", ".", both) ) ) ]
+
+
+cor = cor(cpm[-1], cpm$UHRF1, method="spearman"  ) 
+cor_p = cor.mtest( cpm, method="spearman"    )
+p.value = data.frame ( cor_p$p)
+cor = data.frame ( cor )
+cor$pv =  p.value[ -1, ]$X1
+cor$fdr = p.adjust(cor$pv, method="BH", n=nrow ( cor ))
+
+cor$direction = ifelse ( cor$cor >0 , "pos", "neg")
+
+pos = cor [ cor$direction == "pos", ]
+pos = pos [ order ( -pos$cor), ]
+
+neg = cor [ cor$direction == "neg", ]
+neg = neg [ order ( neg$cor), ]
+
+
+mu <- ddply(cor, "direction", summarise, grp.mean=mean(cor))
+
+
+
+
+# Add mean lines
+p<-ggplot(cor, aes(x=cor, color=direction )) +
+  geom_histogram(aes ( fill= direction ), position="dodge", alpha=0.5 )+
+  geom_vline(data=mu, aes(xintercept=grp.mean, color=direction ),
+             linetype="dashed", size=2)+
+  geom_text(data=mu, aes(x=grp.mean+.022, y=65, label= round ( grp.mean , 1) ), size=6, angle=0, xjust=0, hjust=0) +
+  theme(legend.position="right",  legend.key = element_blank(),
+      # element_blank()
+      axis.text.y = element_text(size= 25 ),
+      axis.text.x =  element_text(size= 25 ),
+      axis.title.x = element_text(size=25),
+      axis.title.y     = element_text(size=25), 
+      legend.text      =element_text(size=25),
+      legend.title = element_text(size=25),
+      plot.title = element_text(size = 25, face = "bold") )+
+      theme(panel.grid.major = element_blank()
+          , panel.grid.minor = element_blank()
+          ,panel.background = element_blank()
+          , axis.line = element_line(colour = "black") ) + ggtitle ( "Histogram UHRF1 correlation w/ TSGs ")
+
+
+p= p+scale_color_manual(values=c("#999999", "#E69F00", "#56B4E9"))+
+  scale_fill_manual(values=c("#999999", "#E69F00", "#56B4E9"))
+
+p 
+
+
+x= "UHRF1"
+y= "CDKN2A"
+
+ggplot(cpm, aes_string(x=x, y=y )) +
+  geom_point(position = position_jitter(width = 0.5, height = 0.5)) + 
+  geom_smooth(method=lm
+              , se=TRUE
+              , fullrange=TRUE
+              )+
+  theme_classic() +  stat_cor(method = "spearman")
+
+
+
+
+
+
+```
+
+```{r}
+
+ wb3 <- createWorkbook()
+  addWorksheet(wb3, 'UHRF1_correlation')
+  writeData(wb3, 'UHRF1_correlation' , cor  )
+  if ( savexls == 1 ){
+  saveWorkbook(wb3, file = paste0(out.dir,"UHRF1_correlation.xlsx"), overwrite = TRUE)
+  }
+
+```
+
+## Expression {.tabset}
+  * CPM calculated as log2 from GDAC LUAD set 
+
+### UHRF1 correlations
+
+* UHRF1 correlation with TSG, define with Kaja's list. 
+* out of a total of <span style="color:#d6542d; font-weight: bold;"> `r length (kaja$gene)` </span>
+* As you can see most of the stronger top correltions are all negatively correlated. 
+* __7/2022__ we added genes from the LUAD paper. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4231481/
+
+  
+
+```{r fig=TRUE,fig.width= 10, fig.height= 6 , echo=FALSE, include=TRUE, results='asis' }
+p 
+
+```
+
+```{r}
+
+
+
+make.pie <- function ( ftype.freq # frequency table two columns only 
+                       ,name.first = "type" # lable for legend 
+                       , title = "" 
+                       , cc= brewer.pal(5, "Set3") 
+                       , leg.pos = "bottom"
+                       ,pietext= 10
+                      
+){
+  
+  colnames ( ftype.freq )[1] = "type"
+  
+  
+  ftype.freq <- ftype.freq %>% 
+    mutate(
+      cs = rev(cumsum(rev(Freq))),
+      text_y = Freq/2 + lead(cs, 1),
+      text_y = if_else(is.na(text_y), Freq/2, text_y)
+    )  %>%  data.frame()
+  
+
+  
+ gg =  ggplot(ftype.freq, aes(x="", y=Freq, fill=type)) +
+    geom_bar(stat="identity", width=1) +
+    coord_polar("y", start=0) + scale_fill_manual(values = cc )   +
+    xlab("") + ylab("") +
+    # scale_color_manual(values= rep("black", 13) ) +
+    theme(axis.title.x=element_blank(),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank()
+          #, axis.ticks.y=element_blank()
+          #, axis.text.y=element_blank()
+    ) +
+    theme(plot.margin=grid::unit(c(0,0,0,0), "mm")) +
+    theme(
+      strip.background = element_blank(),
+      strip.text = element_blank()
+     
+    ) + theme_void()  + 
+    geom_label_repel(
+      data = ftype.freq, 
+      aes(
+        label = ftype.freq$Freq, y = text_y
+      )
+      , 
+      fontface="bold", 
+      color="black",
+      size = pietext, 
+      point.padding = unit(12.25, "lines"),
+      #  box.padding = unit(.25, "lines"),
+      nudge_x = .3,
+      show.legend = F,
+      #segment.color = cc5
+      segment.alpha = 0
+      #segment.linetype = 2, 
+      #segment.curvature = 40, 
+      #arrow = arrow(length = unit(0.015, "npc"))
+    ) + ggtitle(title) + theme ( legend.position = leg.pos) +  guides(fill=guide_legend(title= name.first))
+ 
+ return ( gg )
+  
+}
+
+
+
+```
+
+### breakdown 
+
+```{r fig=TRUE,fig.width= 14, fig.height= 14, echo=FALSE, include=TRUE, results='asis' }
+
+kable( data.frame ( table ( cor$direction) ) , format = "html" , row.names = F, caption = "Rho direction" ) %>% kable_classic(full_width = F,  position = "float_left")
+kable( data.frame ( table ( cor[ abs ( cor$cor) > .3 , ]$direction) ) , format = "html" , row.names = F, caption = "Rho > .3 +/-" ) %>% kable_classic(full_width = F,  position = "left")
+
+
+tally = data.frame ( table ( cor$direction) , stringsAsFactors = F) 
+pie1  = make.pie( tally
+                           , name.first="Rho Direction"
+                           #, cc = drug.color
+                           , leg.pos = "right"
+                           , title = "TSG correlation with UHRF1"
+)
+
+
+
+
+tally = data.frame ( table ( cor[ cor$fdr < .05, ] $direction) , stringsAsFactors = F) 
+pie2  = make.pie( tally
+                           , name.first="Rho Direction"
+                           #, cc = drug.color
+                           , leg.pos = "right"
+                           , title = "TSG correlation with UHRF1, fdr < .05 "
+)
+
+pie1 + pie2
+
+pdf(paste0(paper_fig, "/tsg_pie.pdf"), width=6, height=6)
+pie2
+dev.off()
+
+# break up correlations 
+tally_cor = cor[ cor$fdr < .05 & cor$direction == "neg", ]
+
+```
+
+### List of TSG that significantly negatively correlated with UHRF1 
+  * out of a total of <span style="color:#d6542d; font-weight: bold;"> `r length (kaja$gene)` </span> TSG there were `r nrow ( tally_cor )` that were significantly correlated with UHRF1. 
+    + TSG were from Kaja TSG list, originally `r kaja_og` and `r nrow ( notinkaja_luad)` from the LUAD paper. 
+    + __7/2022__ we added genes from the original LUAD Nature paper. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4231481/
+    + there was a total of `r total_luad1` unique genes. 
+    + subsetting this with COSMIC defined as TSG the total was `r total_luad2`
+    + of these `r nrow ( notinkaja_luad )` was not found in the original TSG list 
+    + the newly added genes included p16 ( CDKN2A  )
+
+```{r fig=TRUE,fig.width= 7 , fig.height= 7 , echo=FALSE, include=TRUE, results='asis' }
+
+
+DT::datatable ( tally_cor  , rownames = T)
+
+
+
+```
+
+```{r}
+# how many of these were not in the original 
+
+
+tally_cor [row.names ( tally_cor) %in% notinkaja_luad,  ] # non of these genes are in here
+notinkaja_luad$gene
+
+
+```
+
+
+```{r}
+# which one of these are also correlated with KRAS? 
+
+cpm_kras = data$cpm
+cpm_kras = cpm_kras [ row.names ( cpm_kras ) %in% unique ( c ( "KRAS", as.character ( row.names ( tally_cor) )) ), ]
+cpm_kras = data.frame( t ( cpm_kras))
+
+cpm_kras = cpm_kras [ , unique ( c ( "KRAS", names ( cpm_kras)  ) ) ]
+
+
+cor_kras = cor(cpm_kras[-1], cpm_kras$KRAS, method="spearman"  ) 
+cor_p = cor.mtest( cpm_kras, method="spearman"    )
+
+p.value = data.frame ( cor_p$p)
+cor_kras = data.frame ( cor_kras )
+cor_kras$pv =  p.value[ -1, ]$X1
+cor_kras$fdr = p.adjust(cor_kras$pv, method="BH", n=nrow ( cor_kras ))
+
+cor_kras$direction = ifelse ( cor_kras$cor_kras >0 , "pos", "neg")
+
+cor_kras =cor_kras[ cor_kras$fdr < .05, ]
+cor_kras = cor_kras[ order ( cor_kras$direction), ]
+
+cor_kras_urhf1 = merge ( tally_cor [ , "cor", drop=F], cor_kras [ cor_kras$direction == "neg", "cor_kras", drop=F], by="row.names" ) 
+colnames (  cor_kras_urhf1  ) = c("gene", "UHRF1_cor", "KRAS_cor")
+
+total_uhrf1_cor = nrow ( tally_cor ) 
+total_uhrf1_cor_neg = nrow ( tally_cor[ tally_cor$direction == "neg", ] ) 
+
+total_uhrf1KRAS_cor = nrow ( cor_kras[ cor_kras$fdr < .05, ] )
+total_uhrf1KRAS_cor_neg = nrow ( cor_kras[ cor_kras$fdr < .05 & cor_kras$direction == "neg", ] ) 
+
+msgtsgkras = paste ( 
+  "out of", total_uhrf1_cor, "TSG's that were significantly anticorrelated with UHFR1,",  total_uhrf1KRAS_cor, "TSGs were also significantly", 
+  "correlated with KRAS, of these", total_uhrf1KRAS_cor_neg, "were significantly anti correlated, or ", round ( total_uhrf1KRAS_cor_neg/total_uhrf1KRAS_cor,2), "percent"
+  )
+
+```
+
+### Including KRAS 
+
+  * Only genes with fdr < .05 correlations are tabulated 
+  * `r msgtsgkras`
+  
+
+```{r fig=TRUE,fig.width= 7 , fig.height= 7 , echo=FALSE, include=TRUE, results='asis' }
+
+tally = data.frame ( table ( cor_kras[ cor_kras$fdr < .05, ] $direction) , stringsAsFactors = F) 
+pie3  = make.pie( tally
+                           , name.first="Rho Direction"
+                           , cc = c(pos="#1c9c86", neg = "#8bf0de")
+                           , leg.pos = "right"
+                           , title = "Significantly Correlated TSG vs KRAS that was also negatively correlated with UHRF1, fdr < .05 "
+)
+
+pie2 + pie3 
+
+
+
+```
+
+### TSG that are anti-correlated with both UHRF1 and KRAS 
+
+```{r fig=TRUE,fig.width= 7 , fig.height= 7 , echo=FALSE, include=TRUE, results='asis' }
+cor_kras_urhf1[] <- lapply(cor_kras_urhf1, function(y) if(is.numeric(y)) round(y, 2) else y)
+DT::datatable ( cor_kras_urhf1  , rownames = F)
+
+```
+
+
+### TOP 12 correlations
+
+ * ranked by absolute rho 
+
+```{r fig=TRUE,fig.width= 7 , fig.height= 7 , echo=FALSE, include=TRUE, results='asis' }
+ 
+cor = cor[ order ( abs ( cor$cor) , decreasing = T ), ]
+
+for ( y in row.names ( cor ) [1:20] ){
+  c = ggplot(cpm, aes_string(x=x, y=y )) +
+  geom_point(position = position_jitter(width = 0.5, height = 0.5)) + 
+  geom_smooth(method=lm
+              , se=TRUE
+              , fullrange=TRUE
+              )+
+  theme_classic() +  stat_cor(method = "spearman")
+  
+  print ( c )
+}
+
+
+```
+
+
+
+
+```{r}
+
+# get ready 
+
+normcol='#6478b4'
+highcol='#ad1f1f' 
+
+
+
+
+eq = c("state","stage","age.diag", "gender")
+# function above builds the formula as such 
+
+eq2 = paste( eq, collapse = "+") 
+eq2 = paste ( "s_objM ~", eq2 )
+as.formula(eq2) 
+
+# survival previously generated, see LUAD.survival.R
+surv = readRDS( paste0("/projects/lab.mis/generic.single.gene/luad.surv.rds")  )
+
+
+
+```
+
+
+```{r}
+
+tsgs = surv [ surv$gene %in% kaja$gene & surv$p.value < .05  & surv$HR < 1 , ]
+
+
+head ( tsgs )
+
+freq = data.frame ( table ( tsgs [ , c("censor", "type")]))
+freq = freq [ order ( freq$Freq, decreasing = T ), ]
+
+kras = tsgs [ tsgs$type == "KRAS", ] 
+wt = tsgs [ tsgs$type == "wt", ]
+
+onlykras = setdiff(kras$gene, wt$gene )
+onlykras = tsgs [ tsgs$gene %in% onlykras, ]
+onlykras = onlykras[ onlykras$type != "all", ]
+
+
+freq = data.frame ( table ( onlykras [ , c("censor", "type")]))
+freq = freq [ order ( freq$Freq, decreasing = T ), ]
+```
+
+
+```{r}
+
+# load survival functions 
+source ( "survival_function.R")
+
+```
+
+
+```{r}
+
+
+# get mutation table 
+xena.mut <- read.table(paste(resource, 
+                             'public/mutations/',"mutation_xena.txt",sep="")
+                       , fill=TRUE, header = TRUE
+                       , sep="\t", stringsAsFactors=F)
+
+xena.mut$sample <- gsub("\\-01","",xena.mut$sample)
+## get survival analysis from: https://www.cell.com/action/showPdf?pii=S0092-8674%2818%2930229-0
+# ok that is 
+# DFI disease free 
+# PFI progression free 
+sclinmain = read.table(
+  paste0(resource, 'public/survival/Survival_SupplementalTable_S1_20171025_xena_sp.tsv',sep=""), fill=TRUE, header = TRUE, sep="\t", stringsAsFactors=F)
+
+
+
+
+
+```
+
+
+
+
+
+## Survival {.tabset}
+
+
+### KRAS depedent tabulation
+
+  * how many genes have the following criteria? 
+    + Genes that have __HR < 1  ( that is increase expression is protective)__
+    + only genes that are __significant in KRAS mutations BUT not WT__
+  * the following censors are analyzed: "OS","DSS","DFI","PFI"
+    + 4 different survival were completed here.
+      - OS, DSS ( Overall Specific Survival, death specific to disease aka not run over by car)
+      - PFI as well as DFI, progression and disease free
+
+```{r fig=TRUE,fig.width=8, fig.height=8, echo=FALSE, include=TRUE, results='asis' }
+
+freq = data.frame ( table ( onlykras [ , c("censor", "type")]))
+freq = freq [ order ( freq$Freq, decreasing = T ), ]
+
+freq = data.frame ( table ( onlykras [ , c("censor", "type")]))
+freq = freq [ order ( freq$Freq, decreasing = T ), ]
+
+kable( freq  , format = "html" , row.names = F, caption = "Total frequency" ) %>% kable_classic(full_width = F, position = "center")
+
+
+```
+
+### HR table 
+
+  * you can sort by HR which will give you the top censor gene that is protective, lower is more protective
+  * you can sort by just censor, so for example if you chose just OS then this will give you only Overall survival 
+
+
+```{r fig=TRUE,fig.width=8, fig.height=8, echo=FALSE, include=TRUE, results='asis' }
+
+
+
+DT::datatable(onlykras,
+              caption = '', rownames = F, filter= list ( position="top", clear = FALSE )  , extensions = 'Buttons'
+              , options = list(dom = 'Bfrtip'
+                               , autoWidth = T, scrollX=T, className = 'dt-left', pageLength =50
+              )
+              
+)
+
+
+```
+
+```{r}
+
+# how many are in the luad list 
+onlykras[onlykras$gene %in% notinkaja_luad$gene, ]
+
+```
+
+
+
+### HR table + TSG {.tabset}
+
+  * how many genes have the following criteria? 
+    + Genes that have __HR < 1  ( that is increase expression is protective)__
+    + only genes that are __significant in KRAS mutations BUT not WT__
+  * the following censors are analyzed: "OS","DSS","DFI","PFI"
+    + 4 different survival were completed here.
+      - OS, DSS ( Overall Specific Survival, death specific to disease aka not run over by car)
+      - PFI as well as DFI, progression and disease free
+  * __ALSO__ in TSG list that correlated negatively with UHRF1 AND KRAS
+
+#### Overall Summary 
+
+
+```{r}
+
+
+
+# get all sig hazard
+surv_kras_tsg_cor_uhrf1 =  surv[  surv$p.value < .05  , ] 
+# remove any genes that also has wt or all  p < .05
+# removing all will not impact since if the gene has KRAS it will automaticall stay 
+wt_hr_genes = surv_kras_tsg_cor_uhrf1[surv_kras_tsg_cor_uhrf1$type %in% c ( "wt", "all"), ]$gene 
+surv_kras_tsg_cor_uhrf1 = surv_kras_tsg_cor_uhrf1[!surv_kras_tsg_cor_uhrf1$gene %in% wt_hr_genes, ]
+
+
+
+
+
+# subset TSG only. 
+surv_kras_tsg_cor_uhrf1 = surv_kras_tsg_cor_uhrf1[surv_kras_tsg_cor_uhrf1$gene %in% row.names ( tally_cor ),   ]
+# remove dups 
+# HR <1 turn into negative so that whe we sort by highest to lowest absolute the one that is more protected will stay after dup 
+# eg,  HR = -.43, .-33 absolute sort wil keep the .43
+surv_kras_tsg_cor_uhrf1$temp = ifelse(surv_kras_tsg_cor_uhrf1$HR < 1, surv_kras_tsg_cor_uhrf1$HR * -1, surv_kras_tsg_cor_uhrf1$HR)
+surv_kras_tsg_cor_uhrf1 = surv_kras_tsg_cor_uhrf1[ order ( surv_kras_tsg_cor_uhrf1$gene,  surv_kras_tsg_cor_uhrf1$temp, decreasing=T), ]
+# wil not remove duplicates because I will just plot each censor type seperately, leave above in case use in future 
+surv_kras_tsg_cor_uhrf1$temp  = NULL 
+
+surv_kras_tsg_cor_uhrf1$pcolor = ifelse ( surv_kras_tsg_cor_uhrf1$HR < 1, "protective","disruptive")
+pcolor =  c( protective = "#338ab5", disruptive="#8a2949")
+
+labelp =  c ( surv_kras_tsg_cor_uhrf1$CI.95.high  ) 
+
+surv_kras_tsg_cor_uhrf1 = surv_kras_tsg_cor_uhrf1[order ( -surv_kras_tsg_cor_uhrf1$HR), ]
+surv_kras_tsg_cor_uhrf1$gene = factor ( surv_kras_tsg_cor_uhrf1$gene , levels = unique ( surv_kras_tsg_cor_uhrf1$gene))
+
+table ( surv_kras_tsg_cor_uhrf1$censor)
+
+
+surv_kras_tsg_cor_uhrf1_plots = list ()
+
+for ( s in c("OS", "PFI")){
+
+surv_kras_tsg_cor_uhrf1_plots [[s]] = surv_kras_tsg_cor_uhrf1 [ surv_kras_tsg_cor_uhrf1$censor == s, ] %>%
+  ggplot(aes(x = HR, 
+             y =  reorder(gene, desc(HR))  
+             )) +
+  # Add point for estimate
+  geom_point(aes(color=pcolor), size=6)+ scale_color_manual(values= pcolor  ) +
+  # Add error bars, use line_typ to set line type
+  geom_errorbar(aes(xmax = CI.95.high,
+                    xmin = CI.95.low,
+                     #lty = line_typ # no need unless you want to do two classes maybe later? 
+                    ),
+                lty = "dashed",
+                show.legend = F,
+                width = 0.02) +
+  # Add estimates values as text
+  geom_text(aes(label = round(HR, 2),
+                 x= HR + .3
+                    ), 
+            # nudge position in x and y directions
+            #nudge_x = 0,
+            nudge_y = 0.2) +
+  # Add dashed vertical line in 0 Difference (y-axis)
+  geom_vline(xintercept=1, lty = "solid") +
+  # Make line for second axis (left side)
+  #geom_vline(xintercept = min_val )  +
+  # Put x axis in the right side and make second axis in bottom
+  scale_x_continuous(position = "top",
+                     sec.axis = sec_axis(~., name = ""),
+                     limits = c(0, 6.5),
+                     expand = c(0,0)) +
+  # Change y axis position and add labs
+  #scale_y_discrete(position = "right",
+   #                labels = df$labs_y) +
+  # Change axis titles
+  labs(x = "Hazard Ratio", y = "Gene") +
+  # Add cowplot theme
+  theme_cowplot()+
+  # Final theme adjustments
+  # Remove ticks and text from bottom secondary axis
+  theme(axis.ticks.x.bottom = element_blank(),
+        axis.text.x.bottom = element_blank(),
+        axis.line = element_line(colour = "black"), legend.position="bottom" ) + ggtitle ( s )
+
+}
+
+```
+
+
+```{r fig=TRUE,fig.width=8, fig.height=8, echo=FALSE, include=TRUE, results='asis' }
+
+# keep this to display later but will remove duplicate sorting decrease asb ( HR )  
+table_all_surv_kras_tsg_cor_uhrf1 = data.frame ( table ( surv_kras_tsg_cor_uhrf1$censor))
+table_all_surv_kras_tsg_cor_uhrf1 = table_all_surv_kras_tsg_cor_uhrf1[order ( table_all_surv_kras_tsg_cor_uhrf1$Freq, decreasing=T), ]
+
+kable( table_all_surv_kras_tsg_cor_uhrf1  , format = "html" , row.names = F, caption = "Total frequency" ) %>% 
+  kable_classic(full_width = F, position = "center", font_size = 27 )
+
+```
+
+#### Forest HR plots 
+
+```{r fig=TRUE,fig.width=12, fig.height=8, echo=FALSE, include=TRUE, results='asis' }
+
+surv_kras_tsg_cor_uhrf1_plots[["OS"]] +  ( surv_kras_tsg_cor_uhrf1_plots[["PFI"]] + ylab("") + theme ( legend.position = "none") )
+
+```
+
+```{r}
+
+## add zheng - combine all negative and visualize results are. 
+
+mut.this = "KRAS"
+plots = list ()
+plots_exp = list()
+cen = c(1:4)
+names ( cen ) = c( "OS","DSS","DFI","PFI")
+
+
+
+
+os_genes = surv_kras_tsg_cor_uhrf1[ surv_kras_tsg_cor_uhrf1$HR < 1 & surv_kras_tsg_cor_uhrf1$censor == "OS", ]$gene
+os_genes = unique ( as.character(os_genes))
+
+df = data$cpm [row.names ( data$cpm  ) %in%  os_genes , , drop=F]
+df =   df[ , t_index]
+
+
+
+surv_kras_tsg_cor_uhrf1_ALL_neg_OS  = wrapper.surv ( test.gene= c ( unique ( as.character ( os_genes)  ) )
+                     ,mutation=mut.this
+                     ,qn=.75
+                     ,counts=df
+                     , mut.table = xena.mut
+                     , sclin=sclinmain
+                     , zheng = 1
+                     , groupname = "TSGs AntiCorrelated with UHRF1"
+                     # no need to define censor since function will plot everything. 
+                     # ,  censor="OS", censor.time="OS.time"
+)
+
+
+
+### new request inputs based on screen, 12.12.2022, CRispr Genes. 
+crispr_gene = read.xlsx('https://www.dropbox.com/s/bb51isqr1wor1ig/UHRF1_hits_CRISPR.xlsx?dl=1')
+
+df2 = data$cpm [row.names ( data$cpm  ) %in%  crispr_gene$Gene , , drop=F]
+df2 =   df2[ , t_index]
+
+
+
+surv_kras_CRISPR_genes = wrapper.surv ( test.gene= c ( unique ( as.character ( crispr_gene$Gene)  ) )
+                     ,mutation=mut.this
+                     ,qn=.75
+                     ,counts=df2
+                     , mut.table = xena.mut
+                     , sclin=sclinmain
+                     , zheng = 1
+                     , groupname = "CRISPR Screen"
+                     # no need to define censor since function will plot everything. 
+                     # ,  censor="OS", censor.time="OS.time"
+)
+
+
+pdf(paste0(final_fig, "/OSS_survival_crispr.pdf"), width=15, height=10.93)
+
+grid.arrange ( 
+    surv_kras_CRISPR_genes$plot.mut$grobs[[ 1 ]] , 
+    surv_kras_CRISPR_genes$plot.wt$grobs[[ 1  ]] , ncol=2 ) 
+dev.off()
+
+pdf(paste0(final_fig, "/DSS_survival_crispr.pdf"), width=15, height=10.93)
+grid.arrange ( 
+    surv_kras_CRISPR_genes$plot.mut$grobs[[ 2 ]] , 
+    surv_kras_CRISPR_genes$plot.wt$grobs[[ 2  ]] , ncol=2 ) 
+dev.off()
+
+crispr_gene2 = c("LIMD1", "CHST10", 'PRKCB', 'EMP2', 'CD44', 'TMEM127', 'CBL','NR4A1', "SRGAP3", "CSRNP1", 'ZNF185')
+
+df2 = data$cpm [row.names ( data$cpm  ) %in%  crispr_gene2, , drop=F]
+df2 =   df2[ , t_index]
+
+surv_kras_CRISPR_genes2 = wrapper.surv ( test.gene= c ( unique ( as.character ( crispr_gene2 )  ) )
+                     ,mutation=mut.this
+                     ,qn=.75
+                     ,counts=df2
+                     , mut.table = xena.mut
+                     , sclin=sclinmain
+                     , zheng = 1
+                     , groupname = "CRISPR Screen"
+                     # no need to define censor since function will plot everything. 
+                     # ,  censor="OS", censor.time="OS.time"
+)
+
+
+grid.arrange ( 
+    surv_kras_CRISPR_genes2$plot.mut$grobs[[ 1 ]] , 
+    surv_kras_CRISPR_genes2$plot.wt$grobs[[ 1  ]] , ncol=2 ) 
+
+
+#grid.arrange( surv_kras_tsg_cor_uhrf1_ALL_neg_OS$plot.mut)
+#grid.arrange( surv_kras_tsg_cor_uhrf1_ALL_neg_OS$plot.wt)
+
+names ( cen ) = c( "OS","DSS","DFI","PFI")
+
+grid.arrange ( 
+    surv_kras_tsg_cor_uhrf1_ALL_neg_OS$plot.mut$grobs[[ 1 ]] , 
+    surv_kras_tsg_cor_uhrf1_ALL_neg_OS$plot.wt$grobs[[ 1  ]] , ncol=2 ) 
+
+
+### plot PFI now 
+pfi_genes = surv_kras_tsg_cor_uhrf1[ surv_kras_tsg_cor_uhrf1$HR < 1 & surv_kras_tsg_cor_uhrf1$censor == "PFI", ]$gene
+pfi_genes = unique ( as.character(pfi_genes))
+
+df = data$cpm [row.names ( data$cpm  ) %in%  pfi_genes , , drop=F]
+df =   df[ , t_index]
+
+
+
+surv_kras_tsg_cor_uhrf1_ALL_neg_PFI  = wrapper.surv ( test.gene= c ( unique ( as.character ( pfi_genes)  ) )
+                                                     ,mutation=mut.this
+                                                     ,qn=.75
+                                                     ,counts=df
+                                                     , mut.table = xena.mut
+                                                     , sclin=sclinmain
+                                                     , zheng = 1
+                                                     , groupname = "TSGs AntiCorrelated with UHRF1"
+                                                     # no need to define censor since function will plot everything. 
+                                                     # ,  censor="OS", censor.time="OS.time"
+)
+
+
+grid.arrange ( 
+    surv_kras_tsg_cor_uhrf1_ALL_neg_PFI$plot.mut$grobs[[ 4 ]] , 
+    surv_kras_tsg_cor_uhrf1_ALL_neg_PFI$plot.wt$grobs[[ 4  ]] , ncol=2 ) 
+
+
+
+### plot DSS now 
+# however DSS is not possible becasue all 8 genes were not protected. 
+# what we do here is better in some ways, which is take every gene that was protected instead of specifying. 
+# thus its 25 genes all together. 
+
+dss_genes = surv_kras_tsg_cor_uhrf1[ surv_kras_tsg_cor_uhrf1$HR < 1 , ]$gene
+dss_genes = unique ( as.character(dss_genes))
+
+df = data$cpm [row.names ( data$cpm  ) %in%  dss_genes , , drop=F]
+df =   df[ , t_index]
+
+
+
+surv_kras_tsg_cor_uhrf1_ALL_neg_DSS  = wrapper.surv ( test.gene= c ( unique ( as.character ( dss_genes)  ) )
+                                                      ,mutation=mut.this
+                                                      ,qn=.75
+                                                      ,counts=df
+                                                      , mut.table = xena.mut
+                                                      , sclin=sclinmain
+                                                      , zheng = 1
+                                                      , groupname = "TSGs AntiCorrelated with UHRF1"
+                                                      # no need to define censor since function will plot everything. 
+                                                      # ,  censor="OS", censor.time="OS.time"
+)
+
+
+grid.arrange ( 
+  surv_kras_tsg_cor_uhrf1_ALL_neg_DSS$plot.mut$grobs[[ 2 ]] , 
+  surv_kras_tsg_cor_uhrf1_ALL_neg_DSS$plot.wt$grobs[[ 2  ]] , ncol=2 ) 
+
+
+
+
+```
+
+#### combined TSG and survival {.tabset}
+
+  * Taking all the “protective” gene in either OS or PFI we show that these genes are collectively protective 
+
+
+##### Overall Specific Survival (OS) 
+
+```{r fig=TRUE,fig.width=13, fig.height=8, echo=FALSE, include=TRUE, results='asis' }
+
+grid.arrange ( 
+    surv_kras_tsg_cor_uhrf1_ALL_neg_OS$plot.mut$grobs[[ 1 ]] , 
+    surv_kras_tsg_cor_uhrf1_ALL_neg_OS$plot.wt$grobs[[ 1  ]] , ncol=2 ) 
+
+```
+
+##### OS table 
+
+```{r fig=TRUE,fig.width=12, fig.height=8, echo=FALSE, include=TRUE, results='asis' }
+
+kable( surv_kras_tsg_cor_uhrf1 [ surv_kras_tsg_cor_uhrf1$censor == "OS" & surv_kras_tsg_cor_uhrf1$gene %in% os_genes, ]
+       , format = "html" , row.names = F, caption = "OS" ) %>% kable_classic(full_width = F, position = "center")
+
+
+```
+
+##### (Progression Free Inverval ) PFI
+
+```{r fig=TRUE,fig.width=12, fig.height=8, echo=FALSE, include=TRUE, results='asis' }
+
+grid.arrange ( 
+    surv_kras_tsg_cor_uhrf1_ALL_neg_PFI$plot.mut$grobs[[ 4 ]] , 
+    surv_kras_tsg_cor_uhrf1_ALL_neg_PFI$plot.wt$grobs[[ 4  ]] , ncol=2 ) 
+
+```
+
+
+##### PFI table 
+
+```{r fig=TRUE,fig.width=12, fig.height=8, echo=FALSE, include=TRUE, results='asis' }
+
+kable( surv_kras_tsg_cor_uhrf1 [ surv_kras_tsg_cor_uhrf1$censor == "PFI" & surv_kras_tsg_cor_uhrf1$gene %in% pfi_genes, ]
+       , format = "html" , row.names = F, caption = "OS" ) %>% kable_classic(full_width = F, position = "center")
+
+
+```
+
+##### ( Disease Specific Survival ) DFF
+  * this is special case 
+  * DSS is not possible becasue all 8 genes were not protected. 
+  * what we do here is better in some ways, which is take every gene that was protected instead of specifying. 
+  * thus its `r length ( dss_genes ) ` genes all together. 
+
+```{r fig=TRUE,fig.width=12, fig.height=8, echo=FALSE, include=TRUE, results='asis' }
+
+grid.arrange ( 
+    surv_kras_tsg_cor_uhrf1_ALL_neg_PFI$plot.mut$grobs[[ 4 ]] , 
+    surv_kras_tsg_cor_uhrf1_ALL_neg_PFI$plot.wt$grobs[[ 4  ]] , ncol=2 ) 
+
+```
+
+```{r}
+
+pdf(paste0(final_fig, "/DSS_survival.pdf"), width=15, height=10.93)
+grid.arrange ( 
+    surv_kras_tsg_cor_uhrf1_ALL_neg_PFI$plot.mut$grobs[[ 4 ]] , 
+    surv_kras_tsg_cor_uhrf1_ALL_neg_PFI$plot.wt$grobs[[ 4  ]] , ncol=2 ) 
+dev.off()
+
+
+
+pdf(paste0(final_fig, "/OSS_survival.pdf"), width=15, height=10.93)
+grid.arrange ( 
+    surv_kras_tsg_cor_uhrf1_ALL_neg_OS$plot.mut$grobs[[ 1 ]] , 
+    surv_kras_tsg_cor_uhrf1_ALL_neg_OS$plot.wt$grobs[[ 1  ]] , ncol=2 ) 
+dev.off()
+
+
+```
+
+
+```{r}
+
+options(scipen=999)
+# probit model 
+# the table output above gives the "genotype" 
+table ( surv_kras_tsg_cor_uhrf1_ALL_neg_OS$df$genome )
+# get the annotatoins table. We want age and stage 
+probit_df = surv_kras_tsg_cor_uhrf1_ALL_neg_OS$df [ , c("sample", "sample2", "age.diag","gender","genome","stage")]
+
+
+
+
+# these are the genes we want to study probit for 
+study_this = unique ( row.names ( tally_cor ) )
+
+or_df = data.frame ()
+
+# add KRAS and UHRF1 to the mix but remove it later 
+
+for ( gg in unique ( c (study_this, "KRAS", "UHRF1") ) ){
+  count_mini  =  data.frame ( t ( data$cpm[row.names ( data$cpm) == gg ,  ] ) )
+  if ( ncol ( count_mini) == 0 ) { next; }
+  print ( gg )
+  colnames(count_mini) = "count"
+  count_mini$sample =  gsub ( "[A-Z]$", "", row.names ( count_mini)  )
+  
+  count_mini = merge(count_mini, probit_df , by.x="sample", by.y = "sample" )
+  count_mini$genome = factor ( count_mini$genome, levels = c("KRAS",'wt' ))
+  
+  count_mini$mutation = ifelse ( count_mini$genome == "KRAS", 1, 0 )
+  count_mini$mutation = factor ( count_mini$mutation, levels= c(1,0))
+  
+  
+  logit = glm(mutation ~ gender + age.diag + count ,  family=binomial(link="logit"), data=count_mini)
+      
+     df= cbind(Estimate=round(coef(logit),4),
+            OR=round(exp(coef(logit)),4), 
+            p.value = coef(summary(logit))[,4]
+            )
+     df = data.frame(df )
+   
+  summary ( logit )    
+  logit.or = exp(coef(logit))
+  
+  df$gene = gg 
+  or_df = rbind ( or_df, df[ 4, ])
+}
+
+
+or_df_ex =   or_df[ or_df$gene %in% c( "KRAS", "UHRF1"  ), ] 
+
+or_df = or_df[ ! or_df$gene %in% c( "KRAS", "UHRF1"  ), ] 
+
+
+or_df = or_df[ or_df$p.value < .05, ] 
+or_df$class = ifelse ( or_df$OR < 1, "low", "high")
+
+table ( or_df$class )  
+
+# histogram 
+
+ccc=c ( low="#d1b543", high="#99755a")  
+cut_here = 1
+msg = ""
+binwidth= 0.20 
+y=.3
+
+
+or_hist = ggplot(or_df, aes(x=OR)) + 
+    geom_histogram(aes(y=(..count..)/sum(..count..), fill=class), colour='white' , alpha=.7 , binwidth= binwidth )+
+    # geom_density(alpha=0, fill="grey") +
+    theme(legend.position="none",  legend.key = element_blank(),
+          # element_blank()
+          axis.text.y = element_text(size= 25 ),
+          axis.text.x =  element_text(size= 25 ),
+          axis.title.x = element_text(size=25),
+          axis.title.y     = element_text(size=25), 
+          legend.text      =element_text(size=25),
+          legend.title = element_text(size=25),
+          plot.title = element_text(size = 40, face = "bold", hjust = 0.5)
+          # hjust centers the title
+    ) + theme(
+              #panel.grid.major = element_blank()
+              #, panel.grid.minor = element_blank()
+              panel.background = element_blank()
+              , axis.line = element_line(colour = "black") # plot border
+    ) + ylab ( "percent") + 
+   geom_vline(xintercept = cut_here, linetype = 2, color = "black") +
+   # annotate(geom = "text", x = cut_here , y = y, label = paste0 ( msg , cut_here ), color = "black", angle = 90, vjust=2.5) + 
+   xlab ("Odd Ratio") + scale_fill_manual(values =ccc) +
+   scale_y_continuous(expand = c(0, 0), limits = c(0, NA)) +
+   theme(legend.position="top", 
+      legend.text      =element_text(size=25),
+      legend.title = element_text(size=25),
+      plot.title = element_text(size = 40, face = "bold", hjust = 0.5)
+      # hjust centers the title
+)
+
+
+tally = data.frame ( table ( or_df$class))
+
+or_pie = make.pie( tally
+                           , name.first="OR class"
+                           , cc = ccc
+                           , leg.pos = "none"
+                           , title = ""
+) 
+ 
+
+
+
+or_hist + or_pie + plot_layout(widths = c(3,1))
+
+
+
+
+```
+
+### Odd ratio {.tabset}
+
+  * Are any TSGs correlated with KRAS mutation? To do this we run a Logit model to calculate Odd ratios. 
+  * from the `r nrow ( tally_cor )` genes that anticorrelated with UHRF1 how many of these gene expression are significantly 
+associated with the odds of having a KRAS mutation vs wt-type in patients with lung cancer. 
+  * Odd ratio > 1: increase expression is associated with higher odds of KRAS mutation
+    + example, an oadd ratio of 1.4 means the odds of having a KRAS mutations is 1.4 times greater with every cpm unit increase in the gene. 
+  * Odd ratio < 1: decrease expression is associated with higher odds of KRAS mutation. 
+    + example, an odd ratio of .4 indicates that thed odds of having a KRAS mutation decreases by a factor 0.4 for every cpm unit increase in the gene 
+    
+#### Histogram 
+
+```{r fig=TRUE,fig.width=7.5, fig.height=6, echo=FALSE, include=TRUE, results='asis' }
+
+or_hist + or_pie + plot_layout(widths = c(3,1))
+
+```
+
+#### Table
+
+  * all significant genes. 
+  * ranked by OR low to high
+
+
+
+```{r fig=TRUE,fig.width=7.5, fig.height=6, echo=FALSE, include=TRUE, results='asis' }
+
+or_df = or_df[ order (or_df$class, -or_df$OR, decreasing=T), ]
+or_df$p.value = round ( or_df$p.value, 5)
+or_df$Estimate = NULL 
+DT::datatable(or_df,
+              caption = '', rownames = F, filter= list ( position="top", clear = FALSE )  , extensions = 'Buttons'
+              , options = list(dom = 'Bfrtip'
+                               , autoWidth = F, scrollX=T, className = 'dt-left', pageLength =20
+              )
+              
+)
+
+```
+
+#### Filtered with KRAS {.tabset}
+
+  * significant ODD ratio 
+  * all genes are significantly correlated with UHRF1 
+  * labels indicates if it also anticorrelates with KRAS 
+
+```{r}
+
+# show top odd ratios. 
+# label those genes that are also correlated with KRAS 
+or_df$kras_urhf1 = ifelse ( or_df$gene %in% cor_kras_urhf1$gene, "yes", "no") 
+dim ( or_df [ or_df$gene %in% cor_kras_urhf1$gene, ] )
+dim ( or_df  )
+or_df_anti_urhf1_kras = or_df [ or_df$gene %in% cor_kras_urhf1$gene, ]
+
+tally = data.frame ( table (or_df[ , c("class", "kras_urhf1")] ))
+tally$per = tally$Freq / sum ( tally$Freq)
+tally$label = paste0 ( tally$class," ", tally$kras_urhf1)
+tally$label = gsub ( "high", "ODD > 1", tally$label )
+tally$label = gsub ( "low", "ODD < 1", tally$label )
+
+tally$label = gsub ( "yes", "anti KRAS", tally$label )
+tally$label = gsub ( "no", "no KRAS", tally$label )
+
+
+odd_tally_plot = ggplot(data = tally,
+       aes(x = "1", y = per, fill = label)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = Freq  ),
+            position = position_stack(vjust = 0.5),
+            color = "grey20", size = 12, fontface = "bold"  ) +
+  coord_polar(theta = "y" ) +
+
+  theme_void() +
+  theme(legend.position = "none",
+        legend.direction = "vertical")+  
+
+  theme ( legend.text      =element_text(size=12),
+          legend.title = element_text(size=12) ) +
+  geom_label(aes(x = 1.55, label = label), 
+             position = position_stack(vjust = 0.5) 
+             ,label.padding = unit(0.5, "lines")
+             , size = 6
+             ) + scale_fill_manual(values=brewer.pal(6, "Set2")   )
+
+
+
+
+
+```
+
+##### Pie chart 
+
+```{r fig=TRUE,fig.width=7.5, fig.height=6, echo=FALSE, include=TRUE, results='asis' }
+
+
+odd_tally_plot
+
+```
+
+##### Table
+
+```{r fig=TRUE,fig.width=7.5, fig.height=6, echo=FALSE, include=TRUE, results='asis' }
+
+
+
+kable( or_df_anti_urhf1_kras  , format = "html" , row.names = F, caption = "Main Key" ) %>% kable_classic(full_width = F, position = "center")
+
+
+
+```
+
+
+
+### HR with multiple censors
+
+* this are genes that significant on multiple censors
+
+```{r fig=TRUE,fig.width=8, fig.height=8, echo=FALSE, include=TRUE, results='asis' }
+
+tophr = data.frame (table ( onlykras$gene )  )
+tophr = tophr[ order ( -tophr$Freq), ]
+
+morethan2 =  onlykras[onlykras$gene %in% tophr[ tophr$Freq >=2, ]$Var1, ]
+
+DT::datatable(morethan2,
+              caption = '', rownames = F, filter= list ( position="top", clear = FALSE )  , extensions = 'Buttons'
+              , options = list(dom = 'Bfrtip'
+                               , autoWidth = T, scrollX=T, className = 'dt-left', pageLength =50
+              )
+              
+)
+
+```
+
+```{r}
+
+# top genes only 
+tophr = data.frame (table ( onlykras$gene )  )
+tophr = tophr[ order ( -tophr$Freq), ]
+
+
+morethan3 =  onlykras[onlykras$gene %in% tophr[ tophr$Freq >=3, ]$Var1, ]
+tophhr = onlykras [ order ( onlykras$HR), ]
+tophr = head ( tophhr )
+
+mut.this = "KRAS"
+plots = list ()
+plots_exp = list()
+cen = c(1:4)
+names ( cen ) = c( "OS","DSS","DFI","PFI")
+
+for ( gene in  unique ( c ( tophr$gene  )   )  ){
+  
+  id = tophr[tophr$gene == gene, ]
+  id2 = gene
+  gene.this = gene 
+  
+  df = data$cpm [row.names ( data$cpm  ) ==  gene.this, , drop=F]
+  df =   df[ , t_index]
+  
+  
+  
+  results2 = wrapper.surv ( test.gene= gene.this
+                                   ,mutation=mut.this
+                                   ,qn=.75
+                                   ,counts=df
+                                   , mut.table = xena.mut
+                                   , sclin=sclinmain
+                                     )
+  
+  
+  plots [[paste ( gene, id$censor)]] = grid.arrange ( 
+    results2$plot.mut$grobs[[cen[id$censor]]] , 
+    results2$plot.wt$grobs[[cen[id$censor]]] , ncol=2 ) 
+  
+
+  
+  plots_exp[[paste (  gene, id$censor) ]] =grid.arrange (  results2$joybee )
+  
+
+
+}
+
+
+```
+
+
+
+
+### Single TSG Gene {.tabset}
+
+```{r fig=TRUE,fig.width=9, fig.height=6, echo=FALSE, include=TRUE, results='asis' }
+
+for ( id in names ( plots)  ){
+   
+  cat("#### ", id , " {.tabset} \n\n")
+  cat ('\n')
+ cat("##### Surv", id , "\n")
+  do.call(grid.arrange,plots[[id]]) 
+cat ( "\n\n")
+
+ cat("##### Exp", id , "\n")
+  do.call(grid.arrange,plots_exp[[id]]) 
+cat ( "\n\n")
+
+
+cat ( "\n\n")
+
+  }
+
+
+
+```
+
+### UHRF1 survival
+
+```{r}
+
+
+
+# urhf1 only 
+  
+df = data$cpm [row.names ( data$cpm  ) ==  "UHRF1" , ,drop=F]
+df =   df[ , t_index]
+  
+  # hold
+
+results2 = wrapper.surv ( test.gene= "UHRF1"
+                          ,mutation=mut.this
+                          ,qn=.75
+                          ,counts=df
+                          , mut.table = xena.mut
+                          , sclin=sclinmain, breakt = 1200
+)
+ 
+
+
+# paper 
+
+joy_surv = ggpval::add_pval(results2$extplots$bee, pairs = list(c(1, 2)), test='t.test')
+
+grid.arrange(
+   results2$plot.mut$grobs[[cen[2]]], 
+     results2$plot.wt$grobs[[cen[2]]], joy_surv, ncol=3
+)
+
+
+
+
+# save for temp 
+if ( 1 > 2) {
+pdf(paste0(paper_fig, "/suvival.pdf"), width=15, height=7.02)
+
+grid.arrange(
+   results2$plot.mut$grobs[[cen[2]]], 
+     results2$plot.wt$grobs[[cen[2]]], joy_surv, ncol=3
+)
+
+
+dev.off()
+
+
+}
+
+
+
+
+```
+
+```{r fig=TRUE,fig.width=14.5, fig.height=8, echo=FALSE, include=TRUE, results='asis' }
+
+grid.arrange(
+   results2$plot.mut$grobs[[cen[2]]], 
+     results2$plot.wt$grobs[[cen[2]]], joy_surv, ncol=3
+)
+
+
+
+```
+
+
+```{r}
+
+# all genes 
+
+gene.this = kaja$gene 
+df = data$cpm [row.names ( data$cpm  ) %in%  unique ( gene.this), , drop=F]
+df =   df[ , t_index]
+
+
+
+all = wrapper.surv ( test.gene= c ( unique ( gene.this  ) )
+                     ,mutation=mut.this
+                     ,qn=.75
+                     ,counts=df
+                     , mut.table = xena.mut
+                     , sclin=sclinmain
+                     , zheng = 1
+                     , groupname = "ALL_TSG"
+)
+
+
+gene.this = row.names ( neg ) 
+df = data$cpm [row.names ( data$cpm  ) %in%  unique ( gene.this), , drop=F]
+df =   df[ , t_index]
+
+
+
+all_neg  = wrapper.surv ( test.gene= c ( unique ( gene.this  ) )
+                     ,mutation=mut.this
+                     ,qn=.75
+                     ,counts=df
+                     , mut.table = xena.mut
+                     , sclin=sclinmain
+                     , zheng = 1
+                     , groupname = "ALL_TSG"
+)
+
+
+
+gene.this = row.names ( pos ) 
+df = data$cpm [row.names ( data$cpm  ) %in%  unique ( gene.this), , drop=F]
+df =   df[ , t_index]
+
+
+
+all_pos  = wrapper.surv ( test.gene= c ( unique ( gene.this  ) )
+                     ,mutation=mut.this
+                     ,qn=.75
+                     ,counts=df
+                     , mut.table = xena.mut
+                     , sclin=sclinmain
+                     , zheng = 1
+                     , groupname = "ALL_TSG"
+)
+
+
+
+
+
+```
+
+
+
+
+
+## Kaja selected correlations {.tabset}
+
+
+### single {.tabset}
+
+```{r fig=TRUE,fig.width=12, fig.height=8, echo=FALSE, include=TRUE, results='asis' }
+
+
+klist = c ( "FHL1", "DLC1", "DUSP22", "LIMD1", "AXIN2", "PTEN", "HBP1", "NR4A1", "NR4A3", "CUX1", "CACNA2D3", "BNIP3L" ) 
+cor_crispr = c(
+ "EMP2"
+,"CSRNP1"
+,"ZDHHC2"
+,"PAFAH1B1"
+,"CD44"
+,"GABARAP"
+,"EPHA3"
+,"NR4A1"
+# 2-28-2023
+, "ZNF185"
+, "TMEM127"
+, "CBL"
+, "CHST10"
+
+)
+
+x="UHRF1"
+
+cor_plot_paper = c()
+cor_df = data.frame()
+fsize = 25 
+for ( y in unique ( c (cor_crispr, klist) ) ){
+  
+  cat ( paste ( "#### ", y, " \n\n")) 
+  c = ggplot(cpm, aes_string(x=x, y=y )) +
+  geom_point(position = position_jitter(width = 0.5, height = 0.5)) + 
+  geom_smooth(method=lm
+              , se=TRUE
+              , fullrange=TRUE
+              )+
+  theme_classic() +  #ggpubr::stat_cor(method = "spearman", r.digits =  2, p.accuracy = .0001 , label.y=.8, size=12 ) + ggtitle ( "" ) +
+    theme(
+      # element_blank()
+      axis.text.y = element_text(size= fsize ),
+      axis.text.x =  element_text(size= fsize ),
+      axis.title.x = element_text(size=fsize),
+      axis.title.y     = element_text(size=fsize), 
+      legend.text      =element_text(size=fsize),
+      legend.title = element_text(size=fsize),
+      plot.title = element_text(size = fsize, face = "bold")
+    )
+  
+  print ( c )
+  cor_plot_paper[[y]] = c 
+  cat ("\n\n")
+  cat('\n\n')
+  
+  cr=cor.test(cpm[, x], cpm[, y], method=c( "spearman"))
+  cor_df = rbind ( cor_df, data.frame ( rho=cr$estimate, p=cr$p.value, gene=y) )
+  
+}
+
+row.names ( cor_df)=cor_df$gene
+
+
+
+
+pdf(paste0(paper_fig, "/exp_correlations.pdf"), width=14, height=7.5)
+(cor_plot_paper[["FHL1"]] + cor_plot_paper[["DLC1"]] ) / (cor_plot_paper[["DUSP22"]] + cor_plot_paper[["AXIN2"]] ) 
+
+dev.off()
+
+png(paste0(paper_fig, "/exp_correlations.png"), units="in", width=10, height=7.5, res=1200)
+(cor_plot_paper[["FHL1"]] + cor_plot_paper[["DLC1"]] ) / (cor_plot_paper[["DUSP22"]] + cor_plot_paper[["AXIN2"]] ) 
+dev.off()
+
+
+tiff(paste0(paper_fig, "/exp_correlations.tiff"), units="in", width=10, height=7.5, res=600)
+(cor_plot_paper[["FHL1"]] + cor_plot_paper[["DLC1"]] ) / (cor_plot_paper[["DUSP22"]] + cor_plot_paper[["AXIN2"]] ) 
+dev.off()
+
+pdf(paste0(paper_fig, "/exp_correlations_flat_noRho.pdf"), width=10.5, height=6.5)
+(cor_plot_paper[["FHL1"]] + cor_plot_paper[["DLC1"]] ) / (cor_plot_paper[["DUSP22"]] + cor_plot_paper[["AXIN2"]] ) 
+
+dev.off()
+
+### for crispr screen 
+
+ 
+
+pdf(paste0(paper_fig, "/exp_correlations_crispr_s1.pdf"), width=10.5, height=6.5)
+(cor_plot_paper[["EMP2"]] + cor_plot_paper[["CSRNP1"]] ) / (cor_plot_paper[["ZDHHC2"]] + cor_plot_paper[["PAFAH1B1"]] ) 
+
+dev.off()
+
+
+pdf(paste0(paper_fig, "/exp_correlations_crispr_s2.pdf"), width=10.5, height=6.5)
+(cor_plot_paper[["CD44"]] + cor_plot_paper[["GABARAP"]] ) / (cor_plot_paper[["EPHA3"]] + cor_plot_paper[["NR4A1"]] ) 
+
+dev.off()
+
+
+pdf(paste0(paper_fig, "/exp_correlations_crispr_s3.pdf"), width=10.5, height=6.5)
+(cor_plot_paper[["ZNF185"]] + cor_plot_paper[["TMEM127"]] ) / (cor_plot_paper[["CBL"]] + cor_plot_paper[["CHST10"]] ) 
+
+dev.off()
+
+
+
+```
+
+
+### KRAS vs WT {.tabset}
+
+```{r fig=TRUE,fig.width=12, fig.height=8, echo=FALSE, include=TRUE, results='asis' }
+
+
+klist = c ( "FHL1", "DLC1", "DUSP22", "LIMD1", "AXIN2", "PTEN", "HBP1", "NR4A1", "NR4A3", "CUX1", "CACNA2D3", "BNIP3L", "KRAS", "ZNF304"
+ ) 
+
+cpm2 = data.frame ( t ( data$cpm[ unique ( c ( "UHRF1", klist)) , ])) 
+row.names ( cpm2 ) = gsub ( ".$", '',  row.names ( cpm2 )  ) 
+cpm2 = merge ( results2$df[ , c("genome", "sample")] , cpm2, by.x="sample", by.y="row.names"  )
+
+for ( y in klist ){
+  
+  cat ( paste ( "#### ", y, " \n\n")) 
+  c = ggplot(cpm2, aes_string(x=x, y=y )) +
+  geom_point(position = position_jitter(width = 0.5, height = 0.5)) + 
+  geom_smooth(method=lm
+              , se=TRUE
+              , fullrange=TRUE
+              )+
+  theme_classic() +  stat_cor(method = "spearman") +  facet_wrap(~ genome, scales = "free" ,  ncol = 2 ) + ggtitle ( y )
+  
+  print ( c )
+  
+  cat ("\n\n")
+  cat('\n\n')
+}
+
+
+
+
+```
+
+```{r}
+
+# specicific to KRAS only 
+y="KRAS"
+ c = ggplot(cpm2, aes_string(x=x, y=y )) +
+  geom_point(position = position_jitter(width = 0.5, height = 0.5)) + 
+  geom_smooth(method=lm
+              , se=TRUE
+              , fullrange=TRUE
+              )+
+  theme_classic() +  
+  theme(legend.position="right",  legend.key = element_blank(),
+      # element_blank()
+      axis.text.y = element_text(size= 25 ),
+      axis.text.x =  element_text(size= 25 ),
+      axis.title.x = element_text(size=25),
+      axis.title.y     = element_text(size=25), 
+      legend.text      =element_text(size=25),
+      legend.title = element_text(size=25),
+      plot.title = element_text(size = 25, face = "bold", hjust = 0.5)
+      # hjust centers the title
+)+ stat_cor(method = "spearman", size=8) +  facet_wrap(~ genome ,  ncol = 2 ) + ggtitle ( y ) +
+   theme(strip.text.x = element_text(size = 30)) + ggtitle ( "")
+  
+
+ 
+ pdf(paste0(final_fig, "/cor_KRAS.pdf"), width=11, height=10.5)
+
+    c
+dev.off()
+
+
+# ZNF304 
+
+y="ZNF304"
+ c = ggplot(cpm2, aes_string(x=x, y=y )) +
+  geom_point(position = position_jitter(width = 0.5, height = 0.5)) + 
+  geom_smooth(method=lm
+              , se=TRUE
+              , fullrange=TRUE
+              )+
+  theme_classic() +  
+  theme(legend.position="right",  legend.key = element_blank(),
+      # element_blank()
+      axis.text.y = element_text(size= 25 ),
+      axis.text.x =  element_text(size= 25 ),
+      axis.title.x = element_text(size=25),
+      axis.title.y     = element_text(size=25), 
+      legend.text      =element_text(size=25),
+      legend.title = element_text(size=25),
+      plot.title = element_text(size = 25, face = "bold", hjust = 0.5)
+      # hjust centers the title
+)+ stat_cor(method = "spearman", size=8) +  facet_wrap(~ genome ,  ncol = 2 ) + ggtitle ( y ) +
+   theme(strip.text.x = element_text(size = 30)) + ggtitle ( "")
+  
+
+ 
+ pdf(paste0(final_fig, "/cor_ZNF304.pdf"), width=11, height=10.5)
+
+    c
+dev.off()
+
+
+
+  
+
+
+```
+
+
+```{r}
+
+# for revision 
+# pdf hold 
+
+wtktlist = list ()
+
+klist = c ( 
+            "ZNF185"
+, "TMEM127"
+, "CBL"
+, "CHST10" ) 
+
+cpm2 = data.frame ( t ( data$cpm[ unique ( c ( "UHRF1", klist)) , ])) 
+row.names ( cpm2 ) = gsub ( ".$", '',  row.names ( cpm2 )  ) 
+cpm2 = merge ( results2$df[ , c("genome", "sample")] , cpm2, by.x="sample", by.y="row.names"  )
+
+for ( y in klist ){
+  
+  cat ( paste ( "#### ", y, " \n\n")) 
+  c = ggplot(cpm2, aes_string(x=x, y=y )) +
+  geom_point(position = position_jitter(width = 0.5, height = 0.5)) + 
+  geom_smooth(method=lm
+              , se=TRUE
+              , fullrange=TRUE
+              )+
+  theme_classic() +  stat_cor(method = "spearman") +  facet_wrap(~ genome, scales = "free" ,  ncol = 2 ) + ggtitle ( y )
+  
+  wtktlist[[y]] = c 
+  
+  cat ("\n\n")
+  cat('\n\n')
+}
+
+
+  (wtktlist$ZNF185 +   wtktlist$TMEM127 ) /
+  (     wtktlist$CBL +   wtktlist$CHST10                             )
+  
+
+
+```
+
+```{r}
+
+# calculate cpg regions 
+
+keyurhf = key [key$siRNA !=  "siKRAS",  ]
+#setting up the genomic region 
+gen <- "hg19"
+####################### 
+
+ann450kOrd <- ann850kSub[order(ann850kSub$chr,ann850kSub$pos),]
+
+# get beta value only for the ids we need 
+bvalOrd <- bvc[match(ann450kOrd$Name,rownames(bvc)), keyurhf$Basename ]
+
+# we only want certain groups - we don't worry abut stats here because its already run 
+design2 <- model.matrix(~0+keyurhf$siRNA    , data=keyurhf )
+colnames ( design2) = gsub ( 'keyurhf\\$',"",colnames(design2))
+
+
+# create a contrast matrix for specific comparisons
+contMatrix2 <- makeContrasts(
+siUHRF1=siRNAsiUHRF1-siRNAsiNeg 
+, levels=design2)
+
+
+
+myAnnotation <- DMRcate :: cpg.annotate(object = as.matrix ( bvalOrd ) , datatype = "array", 
+                                        what = "M", 
+                                        analysis.type = "differential", 
+                                        design = design2, 
+                                        contrasts = T,
+                                        cont.matrix = contMatrix2,
+                                        coef = "siUHRF1", 
+                                        arraytype = "EPIC",
+                                        fdr = 0.05)
+
+
+
+
+```
+
+```{r}
+
+
+### setting up to plot gene structure with methylation
+
+
+# it will plot out cpg groups on top and bottom will contain track info like gene location and island 
+
+# the goal is to define a group and then plot out beta values on top 
+# get new key and new model - the reason is because we only want to plot siUHRF1  group 
+
+
+## dnase track 
+
+dnaseannt = read.table ( "/ehome/resource/annotation/ucsc.tablebrowser/hg19.Dnase.tab", sep="\t", header = F )
+dnaseannt$V1 = NULL 
+colnames ( dnaseannt)[1:3] = c("chr","start","end")
+
+dnaseData <- GRanges(seqnames=dnaseannt[,1],
+                     ranges=IRanges(start=dnaseannt[,2], end=dnaseannt[,3]),
+                     strand=Rle(rep("*",nrow(dnaseannt))),
+                     data=dnaseannt[,5])
+
+# DNaseI hypersensitive site data track
+dnaseTrack <- DataTrack(range=dnaseData, genome=gen, name="DNAseI", 
+                        type="gradient" ) 
+#####
+
+
+promoter_map = 0 # these figs were too big to put into the paper and were not shown. 
+
+temp = result$uhrf1$result # these are results
+
+if ( promoter_map == 1 ) {
+# get cpg that are significant between a group 
+# we are plotting only ones associated with gene regulations eg. promoter, enhancer, tss
+
+ 
+ 
+
+
+
+gplots = temp[ grepl (paste ( klist, collapse = "|") , temp$GencodeCompV12_NAME), ]
+
+table ( gplots$Relation_to_Island)
+table ( gplots$Regulatory_Feature_Group)
+
+
+
+
+### start plotting 
+
+gene.this_p = "CHST10" # for testing only 
+
+
+pdf(paste0(final_fig, "/cpg_promoter.pdf"), width=6.5, height=6)
+ 
+for ( gene.this_p in klist ){
+print ( gene.this_p )
+ggthis = gene.this_p
+
+# need to grep since genes can be in a string with other gene; example KRAS 
+# gene1;kras;gene2 or kras;gene2 or kras etc... 
+
+gene.this_p = paste ( c (  paste0( ";", gene.this_p , ";") 
+             , paste0( "^", gene.this_p , "$") 
+             , paste0( "^", gene.this_p , ";") 
+            , paste0( ";", gene.this_p , "$") 
+)
+           , collapse = "|")
+
+
+
+
+gthis = temp[  grepl ( gene.this_p,  temp$GencodeCompV12_NAME)  & temp$P.Value < .05 , ]
+gthis = gthis[ gthis$Regulatory_Feature_Group == "Promoter_Associated", ] 
+gthis[ , c( "gene",  "Regulatory_Feature_Group", "Relation_to_Island", "logFC" , "GencodeCompV12_Group", "Phantom4_Enhancers")]
+ 
+
+gthis = gthis[order ( gthis$pos), ]
+
+chrom <- as.character(unique(gthis$chr))
+start <- as.numeric(min(gthis$pos))
+end <- as.numeric(max(gthis$pos))
+
+# add 25% extra space to plot
+minbase <- start - (0.25*(end-start))
+maxbase <- end + (0.25*(end-start))
+
+# get min max ylim 
+# this is important else it y will be set from 0 -1 which might be too large to see the difference, 
+maxy = max ( bvalOrd[ gthis$gene, ]  ) + 0.005
+miny = min ( bvalOrd[ gthis$gene, ]  )  - 0.005
+#
+
+iTrack <- IdeogramTrack(genome = gen, chromosome = chrom, name=paste0(chrom))
+gTrack <- GenomeAxisTrack(col="black", cex=1, name="", fontcolor="black")
+rTrack <- UcscTrack(genome=gen, chromosome=chrom, track="NCBI RefSeq", 
+                    from=minbase, to=maxbase, trackType="GeneRegionTrack", 
+                    rstarts="exonStarts", rends="exonEnds", gene="name", 
+                    symbol="name2", transcript="name", strand="strand", 
+                    fill="darkblue",stacking="dense", name=paste0("RefSeq\n", ggthis ) , 
+                    showId=TRUE, geneSymbol=TRUE) # squish, dense 
+
+
+# this is important because I only want to plot what is significant instead of all the other 
+# cpgs; else it could look messy. 
+# assume gthis has all the filters in place 
+
+ann450kOrd2 = ann450kOrd[ row.names ( ann450kOrd) %in% gthis$gene, ]
+
+cpgData <- GRanges(seqnames=Rle(ann450kOrd2$chr),
+                   ranges=IRanges(start=ann450kOrd2$pos, end=ann450kOrd2$pos),
+                   strand=Rle(rep("*",nrow(ann450kOrd2))),
+                   # beta values
+                   betas=bvalOrd[ row.names ( bvalOrd) %in% gthis$gene ,  ])
+
+
+islandTrack <- AnnotationTrack(range=cpgData, genome=gen, name="CpG Is.", 
+                              chromosome=chrom,fill="darkgreen")
+
+# methylation data track, thse are the beta values
+methTrack <- DataTrack(range=cpgData, 
+                       groups=keyurhf$siRNA, # change this if your groups are diffrent
+                       genome = gen,
+                       chromosome=chrom,
+                       ylim=c(-.05, 1.02),
+                      # col=ccc,
+                       type=c("p","a"), 
+                       name="DNA Meth.\n(beta value)",
+                       background.panel="white", 
+                       legend=TRUE, 
+                       cex.title=1.8,
+                       cex.axis=0.8, 
+                       cex.legend=0.8, 
+                       cex = 2 , alpha = .8)
+
+
+# this one compresses so that the difference can be easity seen 
+methTrack2 <- DataTrack(range=cpgData, 
+                       groups=keyurhf$siRNA, # change this if your groups are diffrent
+                       genome = gen,
+                       chromosome=chrom,
+                       ylim=c( miny, maxy),
+                      # col=ccc,
+                       type=c("p","a"), 
+                       name="DNA Meth.\n(beta value)",
+                       background.panel="white", 
+                       legend=TRUE, 
+                       cex.title=1.8,
+                       cex.axis=0.8, 
+                       cex.legend=0.8, 
+                       cex = 2 )
+
+tracks <- list(iTrack, gTrack, methTrack2, dnaseTrack ,
+               islandTrack,
+               rTrack)
+sizes <- c(2,2,12,2,2,3) # set up the relative sizes of the tracks
+
+
+# uncomment to show chromosome
+
+# grid might cause some errors for some genes maybe ineve add 53 which is 5'3' 
+
+
+
+
+
+
+
+tracks2 <- list( methTrack2, dnaseTrack 
+                 ,islandTrack
+                 ,rTrack)
+sizes2 <- c(12,2,2,3) # set up the relative sizes of the tracks
+
+print ( plotTracks(tracks2, from=minbase, to=maxbase, sizes=sizes2 ,transcriptAnnotation = "symbol", lty.grid=3 ) )
+
+
+
+}
+
+dev.off()
+
+}
+
+```
+
+
+
+
+```{r}
+
+genethis2 = c ( 
+"EMP2", "CSRNP1", "ZDHHC2", "PAFAH1B1", "CD44", "GABARAP", "EPHA3", "NR4A1", "SRGAP3", "CHST10", "PIN1", "HIPK2", "ZNF185", "TMEM127", "CBL" 
+)
+
+
+
+klist = genethis2
+# do the same thing but for simple dot plots 
+
+ccc_uhrf = c(  siUHRF1 = "#3FA9F5" , siNeg = "#B3B3B3"  )
+shape_urhf = c(H358=15, A549 = 18)    #  squares (pch=15) for H358 and diamonds (pch=18) for A549
+sgrid = list()
+
+strict = 0; # set to zero for tss and utr instead of just promoter
+hypo_only = 1; # set this to 1 if you want to plot only hypo 
+
+pdf(paste0(final_fig, "/simple1_hypoOnly.pdf"), width=12.5, height=8)
+
+for ( gene.this_p in klist ){
+
+  print ( gene.this_p )
+  
+ggthis = gene.this_p
+
+# need to grep since genes can be in a string with other gene; example KRAS 
+# gene1;kras;gene2 or kras;gene2 or kras etc... 
+
+gene.this_p = paste ( c (  paste0( ";", gene.this_p , ";") 
+             , paste0( "^", gene.this_p , "$") 
+             , paste0( "^", gene.this_p , ";") 
+            , paste0( ";", gene.this_p , "$") 
+)
+           , collapse = "|")
+
+
+
+if ( hypo_only == 1 ){
+
+gthis = temp[  grepl ( gene.this_p,  temp$GencodeCompV12_NAME)  & temp$adj.P.Val < .05 & temp$logFC < 0 , ]
+}else {
+  gthis = temp[  grepl ( gene.this_p,  temp$GencodeCompV12_NAME)  & temp$adj.P.Val < .05  , ]
+}
+  
+## two regid what about selecting by by TSS; 
+if (  strict == 0 ){
+gthis = gthis[ gthis$Regulatory_Feature_Group == "Promoter_Associated" | grepl ( "TSS|5'UTR|1stExon|3'UTR", gthis$GencodeCompV12_Group ), ] 
+}else {
+  gthis = gthis[ gthis$Regulatory_Feature_Group == "Promoter_Associated" , ] 
+}
+
+gthis[ , c( "gene",  "Regulatory_Feature_Group", "Relation_to_Island", "logFC" , "GencodeCompV12_Group", "Phantom4_Enhancers")]
+
+if ( nrow ( gthis) == 0  ){
+  next
+} 
+
+gthis = gthis[order ( gthis$pos), ]
+
+
+
+cpgData <- melt ( as.matrix ( bvalOrd[ row.names ( bvalOrd) %in% gthis$gene ,  ] ) )
+colnames ( cpgData ) = c("cpg","Basename", "beta")
+
+cpgData = merge ( cpgData, keyurhf, by="Basename")
+
+
+single = ggplot(cpgData, aes(cpg, beta)) +
+  geom_point(aes (color = siRNA, shape=factor ( Cells ) ) , position=position_jitter(h=0, w=.1), alpha = .8, size = 6.5) +
+  theme_bw() + scale_color_manual(values= ccc_uhrf) +
+  theme(legend.position="right",  legend.key = element_blank(),
+      # element_blank()
+      axis.text.y = element_text(size= 35 ),
+      axis.text.x = element_text(size=20, angle = 40, hjust=1 ),
+      axis.title.x = element_text(size=25),
+      axis.title.y     = element_text(size=25), 
+      legend.text      =element_text(size=25),
+      legend.title = element_text(size=25),
+legend.key.size = unit(2, 'cm'), 
+      plot.title = element_text(size = 20, face = "bold", hjust = 0.5)
+      # hjust centers the title
+) + theme(panel.grid.major = element_blank()
+          , panel.grid.minor = element_blank()
+          ,panel.background = element_blank()
+          , axis.line = element_line(colour = "black") # plot border
+) +
+  scale_shape_manual(values = shape_urhf ) +
+  guides(
+    fill = FALSE , 
+    shape = guide_legend(title.position="top", title.hjust = 0.5, override.aes = list(size=10) , title ="Cell Type")
+    
+  ) + xlab ( "" ) + ggtitle ( ggthis  )
+
+
+print ( single )
+
+sgrid [[ ggthis ]] = ggplot(cpgData, aes(cpg, beta)) +
+  geom_point(aes (color = siRNA, shape=factor ( Cells) ) , position=position_jitter(h=0, w=.1), alpha = .8, size = 4.5) +
+  theme_bw() + scale_color_manual(values= ccc_uhrf) +
+  theme(legend.position="right",  legend.key = element_blank(),
+      # element_blank()
+      axis.text.y = element_text(size= 22 ),
+      axis.text.x = element_text(size=12, angle = 20, hjust=1 ),
+      axis.title.x = element_text(size=25),
+      axis.title.y     = element_text(size=25), 
+      legend.text      =element_text(size=25),
+      legend.title = element_text(size=25),
+legend.key.size = unit(2, 'cm'), 
+      plot.title = element_text(size = 20, face = "bold", hjust = 0.5)
+      # hjust centers the title
+) + theme(panel.grid.major = element_blank()
+          , panel.grid.minor = element_blank()
+          ,panel.background = element_blank()
+          , axis.line = element_line(colour = "black") # plot border
+)  + xlab ( "" ) + ggtitle ( ggthis  ) + theme ( legend.position = "none ") + ylab ( "") +
+  scale_shape_manual(values = shape_urhf )
+  
+
+}
+
+dev.off()
+
+
+
+
+
+layout <- "
+AAAABBBBBB
+DDDCCCCCC#
+"
+
+pdf(paste0(final_fig, "/grid_hypoOnly.pdf"), width=10, height=8.74)
+
+ sgrid$ZNF185 + sgrid$NR4A1 + (sgrid$CD44 + theme(legend.position = "right") + theme(legend.position = "right") + guides(
+    color = guide_legend( override.aes = list(size=10) , title ="siRNA") , 
+    shape = guide_legend(title.position="top", title.hjust = 0.5, override.aes = list(size=10) , title ="Cells")
+  ) )+ sgrid$GABARAP + plot_layout(design = layout)
+
+ dev.off()
+
+
+
+```
+
+
+## Comparing CPG probes at promoter {.tabset}
+
+
+### single {.tabset}
+
+```{r fig=TRUE,fig.width=12, fig.height=8, echo=FALSE, include=TRUE, results='asis' }
+
+
+for ( y in names ( sgrid ) ){
+  
+  cat ( paste ( "#### ", y, " \n\n")) 
+  print (   sgrid[[y]] )
+ 
+  cat ("\n\n")
+  cat('\n\n')
+  }
+
+
+```
+
+
+```{r}
+genethis2 = unique ( c ( "UHRF1", klist) )
+# plot cpm from rnaseq analysis. 
+
+cpm_cells = read.table ( "/ehome/scripts/geosubmit/kaja_2022/cpm_log2.tsv" , sep="\t", header=T,stringsAsFactors = FALSE,
+                        na.strings=".", quote = "", fill = TRUE)
+
+exp_log = list()
+
+row.names ( cpm_cells ) =  make.unique( cpm_cells$Symbol )
+cpm_cells$Symbol = NULL 
+
+key_cell = colnames ( cpm_cells)      
+
+key_cell = stringr::str_match( key_cell, ( "(.*?)\\.(.*?)\\.(.*$)" ))
+
+key_cell = data.frame ( name= key_cell[, 1], cell = key_cell[ , 2], siRNA = key_cell [ , 3], replicate = as.character ( key_cell[ , 4] ) , stringsAsFactors = F)
+
+
+
+cpm_mod = removeBatchEffect(cpm_cells [ , key_cell$name], batch=key_cell$cell ) 
+cpm_mod = data.frame ( cpm_mod )
+
+
+
+
+
+
+
+  df =  reshape2::  melt ( as.matrix ( cpm_mod [genethis2 , ]) )
+  df = merge ( df, key_cell[key_cell$siRNA != "siKRAS", ], by.x= "Var2", by.y= "name")
+  
+  
+  
+g1 = ggplot(df, aes(siRNA, value)) +
+      # geom_point(aes (color = siRNA, shape=factor ( cell ) ) , position=position_jitter(h=0, w=.1), alpha = .8, size = 6.5) +
+    geom_violin()+ 
+        geom_jitter(position=position_jitter(0.07), aes (color = siRNA, shape=cell ) , size = 2.5, alpha= .5) +
+     theme_bw() + 
+     scale_color_manual(values= ccc_uhrf) +
+      theme(legend.position="right",  legend.key = element_blank(),
+          # element_blank()
+          axis.text.y = element_text(size= 15 ),
+          axis.text.x = element_text(size=15, angle = 30, hjust=1 ),
+          axis.title.x = element_text(size=25),
+          axis.title.y     = element_text(size=25), 
+          legend.text      =element_text(size=25),
+          legend.title = element_text(size=25),
+    legend.key.size = unit(2, 'cm'), 
+          plot.title = element_text(size = 20, face = "bold", hjust = 0.5)
+          # hjust centers the title
+    ) + theme(panel.grid.major = element_blank()
+              , panel.grid.minor = element_blank()
+              ,panel.background = element_blank()
+              , axis.line = element_line(colour = "black") # plot border
+    ) +
+      scale_shape_manual(values = shape_urhf ) + ylab ( "log2 ( cpm + 1) ") +
+      guides(
+        fill = FALSE , 
+        shape = guide_legend(title.position="top", title.hjust = 0.5, override.aes = list(size=10) , title ="Cell Type"),
+         color = guide_legend(title.position="top", title.hjust = 0.5, override.aes = list(size=10) , title ="siRNA")
+      ) + xlab ( "" ) + 
+    stat_summary(fun.y = median, fun.ymin = median, fun.ymax = median,
+                     geom = "crossbar", width = .5) + facet_wrap (.~Var1, scales = "free" )
+  
+   #ggpval::add_pval(g1, pairs = list(c(1, 2)), test='wilcox.test')  
+    
+
+
+pdf(paste0(final_fig, "/rnaseq1.pdf"), width=10.5, height=8)
+g1
+dev.off()
+
+
+
+                         
+```
+
+### Expression
+
+
+```{r fig=TRUE,fig.width=20, fig.height=18, echo=FALSE, include=TRUE, results='asis' }
+g1
+
+```
+
+
+
+```{r}
+
+# find differential correlation 
+
+dcpm = data$cpm 
+colnames ( dcpm ) = gsub ( ".$", '',  colnames ( dcpm )  ) 
+dcpm = dcpm [ ,results2$df$sample ]
+setdiff ( results2$df$sample  , colnames ( dcpm) )
+setdiff ( colnames ( dcpm) , results2$df$sample  )
+
+
+
+
+# filter low expressioin and dispersion ( variance: CV )
+
+dcpm_filtered = filterGenes(dcpm, 
+                          filterTypes = c('central', 'dispersion') , filterDispersionType = "cv", 
+                          filterDispersionPercentile = 0.3, filterCentralPercentile = 0.3 )
+
+dim ( dcpm )
+dim ( dcpm_filtered)
+
+design2 <- model.matrix(~0+results2$df$genome   , data=results2$df)
+colnames ( design2 ) = c("KRAS_WT", "KRAS")
+
+
+cor_res = getCors(inputMat = dcpm_filtered, design = design2 ) 
+dcPairs_res = pairwiseDCor(cor_res, compare = c("KRAS", "KRAS_WT"))
+
+ddcor_res_perm = ddcorAll(inputMat = dcpm_filtered, design = design2,
+  compare = c("KRAS", "KRAS_WT") ,
+  adjust = "perm", heatmapPlot = FALSE, nPerm = 10, splitSet = "UHRF1", corrType = "spearman" )
+
+
+ddcor_res_perm2 = ddcor_res_perm[ddcor_res_perm$pValDiff < .05, ]
+class = ddcor_res_perm2 %>% tidyr::separate (Classes, c("c1", "c2"), "/") 
+class = class[class$c1 == "-", ]
+class = class[ ! ( class$c2 == "-" & class$KRAS_WT_pVal < .05 ), ]
+
+dim (class )
+dim (class[class$Gene1 %in% kaja$gene ,  ] )
+head(class)
+class[class$Gene1 %in% kaja$gene ,  ] 
+
+
+cpm3 = merge ( results2$df[ , c("genome", "sample")] , data.frame ( t ( dcpm )), by.x="sample", by.y="row.names"  )
+cpm3$genome = factor ( cpm3$genome , levels=c("KRAS", "wt"))
+# plot 
+  y = "TMEM133"
+  c = ggplot(cpm3, aes_string(x=x, y=y )) +
+  geom_point(position = position_jitter(width = 0.5, height = 0.5)) + 
+  geom_smooth(method=lm
+              , se=TRUE
+              , fullrange=TRUE
+              )+
+  theme_classic() +  stat_cor(method = "spearman") +  facet_wrap(~ genome, scales = "free" ,  ncol = 2 ) + ggtitle ( y )
+  
+  print ( c )
+  
+  
+  
+  
+
+
+```
+
+
+## Differential correlations {.tabset}
+
+* KRAS vs KRASwt
+* only genes that are negative correlated with UHRF1 in KRAS mutant patients and statistically different in correlation with WT Patients are shown
+
+
+### TOP differential correlations {.tabset}
+
+```{r fig=TRUE,fig.width=12, fig.height=8, echo=FALSE, include=TRUE, results='asis' }
+
+
+clist = head(class$Gene1, 25 )
+
+
+
+for ( y in clist ){
+  
+  cat ( paste ( "#### ", y, " \n\n")) 
+
+  c = ggplot(cpm3, aes_string(x=x, y=y )) +
+  geom_point(position = position_jitter(width = 0.5, height = 0.5)) + 
+  geom_smooth(method=lm
+              , se=TRUE
+              , fullrange=F
+              )+
+  theme_classic() +  stat_cor(method = "spearman") +  facet_wrap(~ genome, scales = "free" ,  ncol = 2 ) + ggtitle ( y )
+  
+  print ( c )
+  
+  
+  
+  cat ("\n\n")
+  cat('\n\n')
+}
+
+x="UHRF1"
+y="ZNF304"
+p3 =  ggplot(cpm3, aes_string(x=x, y=y )) +
+  geom_point(position = position_jitter(width = 0.5, height = 0.5)) + 
+  geom_smooth(method=lm
+              , se=TRUE
+              , fullrange=F
+              )+
+  theme_classic() +  stat_cor(method = "spearman", r.digits =  2, p.accuracy = .0001 , label.y=.8  ) +  facet_wrap(~ genome, scales = "free" ,  ncol = 2 ) + ggtitle ( y )
+
+pdf(paste0(paper_fig, "/ZNF304.pdf"), width=12, height=8)
+
+print ( p3 )
+  
+dev.off()
+while (!is.null(dev.list()))  dev.off()
+
+```
+
+
+### TSG specific ( KAJA's list) {.tabset}
+
+```{r fig=TRUE,fig.width=12, fig.height=8, echo=FALSE, include=TRUE, results='asis' }
+
+
+clist = head(class[class$Gene1 %in% kaja$gene ,  ]$Gene1, 25 )
+
+
+
+for ( y in clist ){
+  
+  cat ( paste ( "#### ", y, " \n\n")) 
+  c = ggplot(cpm3, aes_string(x=x, y=y )) +
+  geom_point(position = position_jitter(width = 0.5, height = 0.5)) + 
+  geom_smooth(method=lm
+              , se=TRUE
+              , fullrange=F
+              )+
+  theme_classic() +  stat_cor(method = "spearman") +  facet_wrap(~ genome, scales = "free" ,  ncol = 2 ) + ggtitle ( y )
+  
+  print ( c )
+  
+  cat ("\n\n")
+  cat('\n\n')
+}
+
+
+
+
+```
+
+### Table 
+
+```{r fig=TRUE,fig.width=12, fig.height=8, echo=FALSE, include=TRUE, results='asis' }
+ DT::datatable( class, rownames = F, filter= list ( position="top", clear = FALSE )  
+                                , extensions = 'Buttons'
+                                      , options = list(dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel', 'pdf', 'print')
+                                                 , autoWidth = T
+                                                 , scrollX=T, className = 'dt-left', pageLength =50 ) )  
+
+```
+
+
+
+
+## Session Info
+
+
+```{r fig=TRUE,fig.width=12, fig.height=7, echo=FALSE, include=TRUE } 
+
+
+sf =sessioninfo::session_info()
+
+
+print ( sessioninfo::session_info()[1] )
+
+
+sf = data.frame(Package=sf$packages[[1]], Version=sf$packages[[2]]
+                , Source=sf$packages$source
+                ,Date=sf$packages$date, stringsAsFactors = F)
+
+kable( sf , format = "html", booktabs = T
+       , caption = "packages"
+       , row.names = F
+     ) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = F) %>%
+    column_spec(c(1), background = "#edf1f2",  border_right = F, bold=T) %>%
+    column_spec(c(2), background = "#f0f5f7",  border_right = T, italic =T)
+
+
+
+```
