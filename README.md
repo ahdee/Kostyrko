@@ -12,6 +12,7 @@ The dataset used for the Kostyrko et al study can be accessed from the GEO Super
   + GSE198289	UHRF1 is a mediator of KRAS driven oncogenesis in lung adenocarcinoma [RNA-seq]
   + GSE198446	UHRF1 is a mediator of KRAS driven oncogenesis in lung adenocarcinoma [epic_methyl]
   + GSE209923	UHRF1 is a mediator of KRAS driven oncogenesis in lung adenocarcinoma [shRNA]
+  + GSE233401	UHRF1 is a mediator of KRAS driven oncogenesis in lung adenocarcinoma [CRISPR_screen]
 # Minimum Requirements
   * Download and install R from here. R (3.6.2) 
   * Download the dataset from GEO SuperSeries GSE198289.
